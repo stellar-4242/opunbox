@@ -29,26 +29,27 @@ const STAKING_SHARE_BPS: u64 = 3000; // 30%
 const MAX_BET_BPS: u64 = 100;       // 1% of total pool
 const MAX_PAYOUT_BPS: u64 = 500;    // 5% of available balance
 
-// Payout tier thresholds (roll = RNG % 10000, range [0, 9999])
-// Tier         | Range          | Probability | Multiplier | EV contribution
-// Jackpot      | [0,   49]      |  0.5%       | 10x        | 0.050
-// Rare         | [50,  249]     |  2.0%       |  5x        | 0.100
-// Uncommon     | [250, 1249]    | 10.0%       |  3x        | 0.300
-// Common win   | [1250, 4749]   | 35.0%       |  1.5x      | 0.525
-// Loss         | [4750, 9999]   | 52.5%       |  0x        | 0.000
-// Total EV (gross) = 0.975 — after 5% house edge taken first, house wins long-term.
-const JACKPOT_THRESHOLD: u64 = 50;     // [0,49]   — 0.5%
-const RARE_THRESHOLD: u64 = 250;       // [50,249]  — 2.0%
-const UNCOMMON_THRESHOLD: u64 = 1250;  // [250,1249] — 10.0%
-const COMMON_THRESHOLD: u64 = 4750;   // [1250,4749] — 35.0%
-// >= 4750 → loss
+// CS2-style payout tiers (roll = RNG % 10000, range [0, 9999])
+// Tier                   | Range         | Probability | Multiplier | EV contribution
+// Gold (Knife)           | [0,   25]     |  0.26%      | 30x        | 0.078
+// Red (Covert)           | [26,  89]     |  0.64%      | 25x        | 0.160
+// Pink (Classified)      | [90,  409]    |  3.20%      |  6x        | 0.192
+// Purple (Restricted)    | [410, 2007]   | 15.98%      |  2x        | 0.320
+// Blue (Mil-Spec)        | [2008, 9999]  | 79.92%      |  0.25x     | 0.200
+// Total EV = 0.950 = 95% RTP
+const GOLD_THRESHOLD: u64 = 26;      // 0-25 = gold (0.26%)
+const RED_THRESHOLD: u64 = 90;       // 26-89 = red (0.64%)
+const PINK_THRESHOLD: u64 = 410;     // 90-409 = pink (3.2%)
+const PURPLE_THRESHOLD: u64 = 2008;  // 410-2007 = purple (15.98%)
+// 2008-9999 = blue (79.92%)
 
-// Multiplier numerators (denominator = 100, i.e. 150 = 1.5x)
-const MULTIPLIER_JACKPOT: u64 = 1000;   // 10x
-const MULTIPLIER_RARE: u64 = 500;       //  5x
-const MULTIPLIER_UNCOMMON: u64 = 300;   //  3x
-const MULTIPLIER_COMMON: u64 = 150;     //  1.5x
-const MULTIPLIER_DENOM: u64 = 100;
+// Multiplier numerators (denominator = 100)
+const MULTI_GOLD: u64 = 3000;    // 30x
+const MULTI_RED: u64 = 2500;     // 25x
+const MULTI_PINK: u64 = 600;     //  6x
+const MULTI_PURPLE: u64 = 200;   //  2x
+const MULTI_BLUE: u64 = 25;      //  0.25x (partial return)
+const MULTI_DENOM: u64 = 100;
 
 
 @final
@@ -167,37 +168,34 @@ export class CaseEngine extends OP_NET {
         this._transfer(motoAddr, lpPoolAddr, netToLP);
         this._addRevenueToPool(lpPoolAddr, netToLP);
 
-        // Determine payout multiplier from roll
-        let multiplierNum: u64 = 0;
-        if (rollU64 < JACKPOT_THRESHOLD) {
-            multiplierNum = MULTIPLIER_JACKPOT;
-        } else if (rollU64 < RARE_THRESHOLD) {
-            multiplierNum = MULTIPLIER_RARE;
-        } else if (rollU64 < UNCOMMON_THRESHOLD) {
-            multiplierNum = MULTIPLIER_UNCOMMON;
-        } else if (rollU64 < COMMON_THRESHOLD) {
-            multiplierNum = MULTIPLIER_COMMON;
+        // Determine payout multiplier from roll (CS2-style tiers)
+        let multiplierNum: u64 = MULTI_BLUE; // default: blue (0.25x partial return)
+        if (rollU64 < GOLD_THRESHOLD) {
+            multiplierNum = MULTI_GOLD;
+        } else if (rollU64 < RED_THRESHOLD) {
+            multiplierNum = MULTI_RED;
+        } else if (rollU64 < PINK_THRESHOLD) {
+            multiplierNum = MULTI_PINK;
+        } else if (rollU64 < PURPLE_THRESHOLD) {
+            multiplierNum = MULTI_PURPLE;
         }
-        // else: multiplierNum = 0  → loss
+        // else: blue tier — 0.25x partial return (always pays out something)
 
-        const won: bool = multiplierNum > 0;
+        // All tiers pay out — blue returns 25% of bet from pool
+        const won: bool = true;
 
-        if (won) {
-            // Payout = betAmount * multiplierNum / MULTIPLIER_DENOM
-            // e.g. 1.5x: betAmount * 150 / 100
-            const payout: u256 = SafeMath.div(
-                SafeMath.mul(betAmount, u256.fromU64(multiplierNum)),
-                u256.fromU64(MULTIPLIER_DENOM),
-            );
+        // Payout = betAmount * multiplierNum / MULTI_DENOM
+        const payout: u256 = SafeMath.div(
+            SafeMath.mul(betAmount, u256.fromU64(multiplierNum)),
+            u256.fromU64(MULTI_DENOM),
+        );
 
-            if (u256.gt(payout, maxPayout)) {
-                throw new Revert('CaseEngine: payout exceeds max payout cap');
-            }
-
-            // LP pool sends payout to the winner
-            this._pullPayoutFromPool(lpPoolAddr, caller, payout);
+        if (u256.gt(payout, maxPayout)) {
+            throw new Revert('CaseEngine: payout exceeds max payout cap');
         }
-        // On loss: player gets nothing back. Net bet already in pool above.
+
+        // LP pool sends payout to the player
+        this._pullPayoutFromPool(lpPoolAddr, caller, payout);
 
         // Optional side-effects — mustSucceed=false
         this._mintCASAForPlayer(caller, betAmount);
