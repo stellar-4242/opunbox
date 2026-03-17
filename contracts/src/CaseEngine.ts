@@ -114,14 +114,14 @@ export class CaseEngine extends OP_NET {
             u256.fromU64(10000),
         );
 
-        // Transfer MOTO from player
-        const motoAddr: Address = this.motoToken.value;
-        this._transferFrom(motoAddr, caller, Blockchain.contractAddress, betAmount);
-
-        // AUDIT FIX: Increment nonce BEFORE hash computation
+        // CEI FIX (NEW-H4): Increment nonce BEFORE any external interaction
         const currentNonce: u256 = this.nonces.get(caller);
         const newNonce: u256 = SafeMath.add(currentNonce, u256.One);
         this.nonces.set(caller, newNonce);
+
+        // Transfer MOTO from player (interaction comes after state update)
+        const motoAddr: Address = this.motoToken.value;
+        this._transferFrom(motoAddr, caller, Blockchain.contractAddress, betAmount);
 
         // RNG: sha256(blockHash + userSeed + callerAddress + perAddressNonce)
         const blockHash: Uint8Array = Blockchain.getBlockHash(Blockchain.block.number - 1);
@@ -148,11 +148,9 @@ export class CaseEngine extends OP_NET {
             // Distribute house edge first
             this._distributeHouseEdge(houseEdge, lpPoolAddr);
 
-            // AUDIT FIX: Revenue distribution mustSucceed=TRUE
+            // Pool pays out: net bet (95%). Player's return IS the pool payout.
+            // NEW-C1 FIX: Do NOT also return betAmount — that is a double-spend.
             this._pullPayoutFromPool(lpPoolAddr, caller, payoutFromPool);
-
-            // Return player's bet (we held it during execution)
-            this._transfer(motoAddr, caller, betAmount);
         } else {
             // Player loses — distribute house edge
             this._distributeHouseEdge(houseEdge, lpPoolAddr);

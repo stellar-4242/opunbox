@@ -273,8 +273,10 @@ export class LPPool extends OP_NET {
         const amount: u256 = calldata.readU256();
         if (amount.isZero()) throw new Revert('LPPool: revenue amount is zero');
 
-        // AUDIT FIX: increment totalDeposited for full net inflow
-        this.totalDeposited.value = SafeMath.add(this.totalDeposited.value, amount);
+        // NEW-C2 FIX: Do NOT increment totalDeposited here.
+        // Physical MOTO was already transferred to this contract by _transfer() in CaseEngine.
+        // addRevenue() ONLY updates the revenuePerShare accumulator for LP reward distribution.
+        // totalDeposited is only modified in deposit(), withdraw(), and pullPayout().
 
         // Distribute to LPs via revenuePerShare accumulator
         const totalShares: u256 = this.totalWeightedShares.value;
