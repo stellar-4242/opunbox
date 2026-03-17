@@ -100,7 +100,10 @@ export class CaseEngine extends OP_NET {
         { name: 'amount', type: ABIDataTypes.UINT256 },
         { name: 'userSeed', type: ABIDataTypes.BYTES32 },
     )
-    @returns({ name: 'won', type: ABIDataTypes.BOOL })
+    @returns(
+        { name: 'won', type: ABIDataTypes.BOOL },
+        { name: 'payout', type: ABIDataTypes.UINT256 },
+    )
     public openCase(calldata: Calldata): BytesWriter {
         const caller: Address = Blockchain.tx.sender;
         const origin: Address = Blockchain.tx.origin;
@@ -183,7 +186,7 @@ export class CaseEngine extends OP_NET {
         // else: blue tier — 0.25x partial return (always pays out something)
 
         // Payout = betAmount * multiplierNum / MULTI_DENOM
-        const payout: u256 = SafeMath.div(
+        let payout: u256 = SafeMath.div(
             SafeMath.mul(betAmount, u256.fromU64(multiplierNum)),
             u256.fromU64(MULTI_DENOM),
         );
@@ -192,8 +195,9 @@ export class CaseEngine extends OP_NET {
         // Blue (0.25x) is a net loss; purple (2x) and above are wins.
         const won: bool = u256.ge(payout, betAmount);
 
+        // FIX: cap payout to maxPayout instead of reverting (standard casino practice)
         if (u256.gt(payout, maxPayout)) {
-            throw new Revert('CaseEngine: payout exceeds max payout cap');
+            payout = maxPayout;
         }
 
         // LP pool sends payout to the player
@@ -203,8 +207,10 @@ export class CaseEngine extends OP_NET {
         this._mintCASAForPlayer(caller, betAmount);
         this._creditPointsForWager(caller, betAmount);
 
-        const w = new BytesWriter(1);
+        // Return won (BOOL) + payout (UINT256) so frontend can display both
+        const w = new BytesWriter(33); // 1 byte bool + 32 bytes u256
         w.writeBoolean(won);
+        w.writeU256(payout);
         return w;
     }
 

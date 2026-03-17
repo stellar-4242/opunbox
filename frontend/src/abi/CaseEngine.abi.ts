@@ -11,7 +11,8 @@ export const CASE_ENGINE_ABI: BitcoinInterfaceAbi = [
             { name: 'userSeed', type: ABIDataTypes.BYTES32 }
         ],
         outputs: [
-            { name: 'won', type: ABIDataTypes.BOOL }
+            { name: 'won', type: ABIDataTypes.BOOL },
+            { name: 'payout', type: ABIDataTypes.UINT256 }
         ]
     },
     {
