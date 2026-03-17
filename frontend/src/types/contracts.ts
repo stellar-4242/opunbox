@@ -4,6 +4,7 @@ import type { CallResult } from 'opnet';
 // Index-signature-compatible result types (required by ContractDecodedObjectResult)
 export interface OpenCaseResult extends ContractDecodedObjectResult {
     won: boolean;
+    payout: bigint;
 }
 
 export interface GetPoolInfoResult extends ContractDecodedObjectResult {
