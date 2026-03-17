@@ -35,7 +35,7 @@ const MULTI_DENOM: u64 = 1000;
 const RESERVE_BPS: u64 = 2000; // 20% reserve (out of 10000)
 const MIN_POOL_THRESHOLD: u256 = u256.fromString('1000000000000000000000'); // 1000 MOTO * 10^18
 const DECIMAL_BASE: u256 = u256.fromString('1000000000000000000'); // 10^18
-const MIN_DEPOSIT: u256 = u256.fromString('1000000000000000000'); // 1 MOTO (10^18)
+const MIN_DEPOSIT: u256 = u256.fromString('10000000000000000000'); // 10 MOTO (10 * 10^18)
 
 
 @final
