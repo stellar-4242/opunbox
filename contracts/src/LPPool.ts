@@ -122,6 +122,8 @@ export class LPPool extends OP_NET {
             if (!pending.isZero()) {
                 // Auto-compound pending into deposit amount
                 this.depositAmount.set(caller, SafeMath.add(existingAmount, pending));
+                // MAJOR-2 FIX: also increment totalDeposited by the compounded amount
+                this.totalDeposited.value = SafeMath.add(this.totalDeposited.value, pending);
             }
         }
 

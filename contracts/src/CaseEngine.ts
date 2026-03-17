@@ -28,7 +28,27 @@ const STAKING_SHARE_BPS: u64 = 3000; // 30%
 // Treasury = 10% (remainder)
 const MAX_BET_BPS: u64 = 100;       // 1% of total pool
 const MAX_PAYOUT_BPS: u64 = 500;    // 5% of available balance
-const WIN_THRESHOLD: u64 = 4750;    // ~47.5% win rate out of 10000
+
+// Payout tier thresholds (roll = RNG % 10000, range [0, 9999])
+// Tier         | Range          | Probability | Multiplier | EV contribution
+// Jackpot      | [0,   49]      |  0.5%       | 10x        | 0.050
+// Rare         | [50,  249]     |  2.0%       |  5x        | 0.100
+// Uncommon     | [250, 1249]    | 10.0%       |  3x        | 0.300
+// Common win   | [1250, 4749]   | 35.0%       |  1.5x      | 0.525
+// Loss         | [4750, 9999]   | 52.5%       |  0x        | 0.000
+// Total EV (gross) = 0.975 — after 5% house edge taken first, house wins long-term.
+const JACKPOT_THRESHOLD: u64 = 50;     // [0,49]   — 0.5%
+const RARE_THRESHOLD: u64 = 250;       // [50,249]  — 2.0%
+const UNCOMMON_THRESHOLD: u64 = 1250;  // [250,1249] — 10.0%
+const COMMON_THRESHOLD: u64 = 4750;   // [1250,4749] — 35.0%
+// >= 4750 → loss
+
+// Multiplier numerators (denominator = 100, i.e. 150 = 1.5x)
+const MULTIPLIER_JACKPOT: u64 = 1000;   // 10x
+const MULTIPLIER_RARE: u64 = 500;       //  5x
+const MULTIPLIER_UNCOMMON: u64 = 300;   //  3x
+const MULTIPLIER_COMMON: u64 = 150;     //  1.5x
+const MULTIPLIER_DENOM: u64 = 100;
 
 
 @final
@@ -129,38 +149,55 @@ export class CaseEngine extends OP_NET {
 
         // roll = randomValue % 10000
         const roll: u256 = SafeMath.mod(randomValue, u256.fromU64(10000));
-        const won: bool = u256.lt(roll, u256.fromU64(WIN_THRESHOLD));
+        const rollU64: u64 = roll.toU64();
 
-        // houseEdge = betAmount * 5%
+        // houseEdge = betAmount * 5%  (taken from every bet, regardless of outcome)
         const houseEdge: u256 = SafeMath.div(
             SafeMath.mul(betAmount, u256.fromU64(HOUSE_EDGE_BPS)),
             u256.fromU64(10000),
         );
 
-        if (won) {
-            // Pool pays: betAmount - houseEdge (net payout from pool)
-            const payoutFromPool: u256 = SafeMath.sub(betAmount, houseEdge);
+        // Net bet (95%) is sent to LP pool as principal on every spin
+        const netToLP: u256 = SafeMath.sub(betAmount, houseEdge);
 
-            if (u256.gt(payoutFromPool, maxPayout)) {
+        // Distribute house edge (60% LP / 30% staking / 10% treasury)
+        this._distributeHouseEdge(houseEdge, lpPoolAddr);
+
+        // Transfer net bet to LP pool — principal always goes in
+        this._transfer(motoAddr, lpPoolAddr, netToLP);
+        this._addRevenueToPool(lpPoolAddr, netToLP);
+
+        // Determine payout multiplier from roll
+        let multiplierNum: u64 = 0;
+        if (rollU64 < JACKPOT_THRESHOLD) {
+            multiplierNum = MULTIPLIER_JACKPOT;
+        } else if (rollU64 < RARE_THRESHOLD) {
+            multiplierNum = MULTIPLIER_RARE;
+        } else if (rollU64 < UNCOMMON_THRESHOLD) {
+            multiplierNum = MULTIPLIER_UNCOMMON;
+        } else if (rollU64 < COMMON_THRESHOLD) {
+            multiplierNum = MULTIPLIER_COMMON;
+        }
+        // else: multiplierNum = 0  → loss
+
+        const won: bool = multiplierNum > 0;
+
+        if (won) {
+            // Payout = betAmount * multiplierNum / MULTIPLIER_DENOM
+            // e.g. 1.5x: betAmount * 150 / 100
+            const payout: u256 = SafeMath.div(
+                SafeMath.mul(betAmount, u256.fromU64(multiplierNum)),
+                u256.fromU64(MULTIPLIER_DENOM),
+            );
+
+            if (u256.gt(payout, maxPayout)) {
                 throw new Revert('CaseEngine: payout exceeds max payout cap');
             }
 
-            // Distribute house edge first
-            this._distributeHouseEdge(houseEdge, lpPoolAddr);
-
-            // Pool pays out: net bet (95%). Player's return IS the pool payout.
-            // NEW-C1 FIX: Do NOT also return betAmount — that is a double-spend.
-            this._pullPayoutFromPool(lpPoolAddr, caller, payoutFromPool);
-        } else {
-            // Player loses — distribute house edge
-            this._distributeHouseEdge(houseEdge, lpPoolAddr);
-
-            // Remaining (95% of bet) goes to LP pool
-            const netToLP: u256 = SafeMath.sub(betAmount, houseEdge);
-            // AUDIT FIX: Send to LP + call addRevenue to update totalDeposited
-            this._transfer(motoAddr, lpPoolAddr, netToLP);
-            this._addRevenueToPool(lpPoolAddr, netToLP);
+            // LP pool sends payout to the winner
+            this._pullPayoutFromPool(lpPoolAddr, caller, payout);
         }
+        // On loss: player gets nothing back. Net bet already in pool above.
 
         // Optional side-effects — mustSucceed=false
         this._mintCASAForPlayer(caller, betAmount);
