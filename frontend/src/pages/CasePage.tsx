@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useWallet } from '../hooks/useWallet';
 import { useTransaction } from '../hooks/useTransaction';
-import { getCaseEngineContract } from '../services/contracts';
+import { getCaseEngineContract, getMotoTokenContract } from '../services/contracts';
 import { ExplorerLinks } from '../components/ExplorerLinks';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { SkeletonBlock } from '../components/SkeletonLoader';
@@ -15,6 +15,7 @@ import {
 import type { CaseResult } from '../types/contracts';
 
 const MAX_HISTORY = 10;
+const CASE_ENGINE_ADDRESS = import.meta.env.VITE_CASE_ENGINE_ADDRESS as string | undefined;
 
 export function CasePage(): React.ReactElement {
     const { isConnected, walletAddress, senderAddress } = useWallet();
@@ -26,6 +27,7 @@ export function CasePage(): React.ReactElement {
     const [customSeed, setCustomSeed] = useState('');
     const [seedError, setSeedError] = useState('');
     const [simulating, setSimulating] = useState(false);
+    const [txStep, setTxStep] = useState<'idle' | 'approving' | 'opening'>('idle');
     const [lastResult, setLastResult] = useState<{ won: boolean } | null>(null);
     const [history, setHistory] = useState<CaseResult[]>([]);
     const [poolTotal, setPoolTotal] = useState<bigint | null>(null);
@@ -62,6 +64,7 @@ export function CasePage(): React.ReactElement {
 
     const handleOpenCase = useCallback(async (): Promise<void> => {
         if (!isConnected || !senderAddress || !walletAddress) return;
+        if (!CASE_ENGINE_ADDRESS) return;
 
         const activeSeed = useCustomSeed ? customSeed : userSeed;
         if (useCustomSeed && !validateHexSeed(activeSeed)) {
@@ -87,9 +90,29 @@ export function CasePage(): React.ReactElement {
 
         reset();
         setSimulating(true);
+        setTxStep('approving');
         setLastResult(null);
 
         try {
+            // Step 1: increaseAllowance on MOTO token for the CaseEngine
+            const motoToken = getMotoTokenContract(senderAddress);
+            const allowanceResult = await motoToken.increaseAllowance(CASE_ENGINE_ADDRESS, amount);
+
+            if (allowanceResult.revert) {
+                throw new Error(`Allowance failed: ${allowanceResult.revert}`);
+            }
+
+            setSimulating(false);
+            const allowanceTxHash = await send(allowanceResult);
+            if (!allowanceTxHash) {
+                setTxStep('idle');
+                return;
+            }
+
+            // Step 2: openCase
+            setSimulating(true);
+            setTxStep('opening');
+
             const contract = getCaseEngineContract(senderAddress);
             const callResult = await contract.openCase(amount, seedBytes);
 
@@ -120,9 +143,17 @@ export function CasePage(): React.ReactElement {
             const msg = err instanceof Error ? err.message : 'Failed to open case';
             console.error(msg);
         }
+        setTxStep('idle');
     }, [isConnected, senderAddress, walletAddress, useCustomSeed, customSeed, userSeed, betAmount, send, reset]);
 
     const isLoading = simulating || txState.loading;
+
+    function getButtonLabel(): string {
+        if (txStep === 'approving') return 'Step 1: Approving tokens...';
+        if (txStep === 'opening') return 'Step 2: Opening case...';
+        if (isLoading) return 'Opening...';
+        return 'Open Case';
+    }
 
     return (
         <main className="page">
@@ -208,6 +239,20 @@ export function CasePage(): React.ReactElement {
                     </span>
                 </div>
 
+                {txStep !== 'idle' && (
+                    <div className="step-indicator">
+                        <div className={`step-indicator__step ${txStep === 'approving' ? 'step-indicator__step--active' : 'step-indicator__step--done'}`}>
+                            <span className="step-indicator__number">1</span>
+                            <span className="step-indicator__label">Approve tokens</span>
+                        </div>
+                        <div className={`step-indicator__divider`} />
+                        <div className={`step-indicator__step ${txStep === 'opening' ? 'step-indicator__step--active' : ''}`}>
+                            <span className="step-indicator__number">2</span>
+                            <span className="step-indicator__label">Open case</span>
+                        </div>
+                    </div>
+                )}
+
                 {txState.error && (
                     <ErrorBanner message={txState.error} onDismiss={reset} />
                 )}
@@ -218,7 +263,7 @@ export function CasePage(): React.ReactElement {
                     disabled={isLoading || !isConnected || !betAmount}
                     type="button"
                 >
-                    {isLoading ? 'Opening...' : 'Open Case'}
+                    {getButtonLabel()}
                 </button>
 
                 {!isConnected && (

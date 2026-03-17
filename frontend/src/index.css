@@ -1032,3 +1032,79 @@ input {
         font-size: 1.4rem;
     }
 }
+
+/* ── Step Indicator ─────────────────────────────────────────── */
+.step-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-md);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.step-indicator__step {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+    opacity: 0.4;
+    transition: opacity var(--transition-base);
+}
+
+.step-indicator__step--active {
+    opacity: 1;
+}
+
+.step-indicator__step--done {
+    opacity: 0.7;
+}
+
+.step-indicator__number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    flex-shrink: 0;
+}
+
+.step-indicator__step--active .step-indicator__number {
+    background: var(--color-accent);
+    color: #000;
+}
+
+.step-indicator__step--done .step-indicator__number {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.step-indicator__label {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+}
+
+.step-indicator__step--active .step-indicator__label {
+    color: var(--color-text-primary);
+    font-weight: 500;
+}
+
+.step-indicator__divider {
+    width: 2rem;
+    height: 1px;
+    background: var(--color-border);
+    flex-shrink: 0;
+    margin: 0 var(--space-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .step-indicator__step {
+        transition: none;
+    }
+}

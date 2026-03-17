@@ -23,6 +23,8 @@ export function useTransaction(walletAddress) {
                 maximumAllowedSatToSpend: MAX_SAT_TO_SPEND,
                 network: net,
             };
+            // The CallResult is already the simulation output from getContract() method call.
+            // Revert detection is handled by the calling page before invoking send().
             const receipt = await callResult.sendTransaction(params);
             const txHash = receipt.transactionId;
             setState({ loading: false, error: null, txHash });

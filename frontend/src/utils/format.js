@@ -1,6 +1,6 @@
-const TOKEN_DECIMALS = 8n;
+const TOKEN_DECIMALS = 18n;
 const TOKEN_SCALE = 10n ** TOKEN_DECIMALS;
-export function formatTokenAmount(raw, decimals = 8) {
+export function formatTokenAmount(raw, decimals = 18) {
     const scale = 10n ** BigInt(decimals);
     const whole = raw / scale;
     const frac = raw % scale;
@@ -9,7 +9,7 @@ export function formatTokenAmount(raw, decimals = 8) {
         return whole.toLocaleString();
     return `${whole.toLocaleString()}.${fracStr}`;
 }
-export function parseTokenAmount(input, decimals = 8) {
+export function parseTokenAmount(input, decimals = 18) {
     const scale = 10n ** BigInt(decimals);
     const trimmed = input.trim();
     if (!trimmed || trimmed === '.')

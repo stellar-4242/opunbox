@@ -4,11 +4,13 @@ import { CASE_ENGINE_ABI } from '../abi/CaseEngine.abi';
 import { LP_POOL_ABI } from '../abi/LPPool.abi';
 import { CASA_STAKING_ABI } from '../abi/CASAStaking.abi';
 import { POINTS_ABI } from '../abi/Points.abi';
+import { OP20_ALLOWANCE_ABI } from '../abi/OP20.abi';
 import type {
     ICaseEngineContract,
     ILPPoolContract,
     ICASAStakingContract,
     IPointsContract,
+    IOP20TokenContract,
 } from '../types/contracts';
 
 const NETWORK = import.meta.env.VITE_NETWORK ?? 'testnet';
@@ -16,6 +18,8 @@ const CASE_ENGINE_ADDRESS = import.meta.env.VITE_CASE_ENGINE_ADDRESS;
 const LP_POOL_ADDRESS = import.meta.env.VITE_LP_POOL_ADDRESS;
 const CASA_STAKING_ADDRESS = import.meta.env.VITE_CASA_STAKING_ADDRESS;
 const POINTS_ADDRESS = import.meta.env.VITE_POINTS_ADDRESS;
+const MOTO_TOKEN_ADDRESS = import.meta.env.VITE_MOTO_TOKEN_ADDRESS;
+const CASA_TOKEN_ADDRESS = import.meta.env.VITE_CASA_TOKEN_ADDRESS;
 
 function isAddressSet(addr: string | undefined): addr is string {
     return typeof addr === 'string' && addr.trim().length > 0;
@@ -83,6 +87,36 @@ export function getPointsContract(sender?: Address): IPointsContract {
 
 export function getProvider(): ReturnType<typeof providerService.getProvider> {
     return providerService.getProvider(NETWORK);
+}
+
+export function getMotoTokenContract(sender?: Address): IOP20TokenContract {
+    if (!isAddressSet(MOTO_TOKEN_ADDRESS)) {
+        throw new Error('VITE_MOTO_TOKEN_ADDRESS is not configured');
+    }
+    const provider = providerService.getProvider(NETWORK);
+    const network = providerService.getNetwork(NETWORK);
+    return getCachedContract<IOP20TokenContract>(
+        MOTO_TOKEN_ADDRESS,
+        OP20_ALLOWANCE_ABI,
+        provider,
+        network,
+        sender,
+    );
+}
+
+export function getCasaTokenContract(sender?: Address): IOP20TokenContract {
+    if (!isAddressSet(CASA_TOKEN_ADDRESS)) {
+        throw new Error('VITE_CASA_TOKEN_ADDRESS is not configured');
+    }
+    const provider = providerService.getProvider(NETWORK);
+    const network = providerService.getNetwork(NETWORK);
+    return getCachedContract<IOP20TokenContract>(
+        CASA_TOKEN_ADDRESS,
+        OP20_ALLOWANCE_ABI,
+        provider,
+        network,
+        sender,
+    );
 }
 
 export { Address };

@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '../hooks/useWallet';
 import { useTransaction } from '../hooks/useTransaction';
-import { getLPPoolContract } from '../services/contracts';
+import { getLPPoolContract, getMotoTokenContract } from '../services/contracts';
 import { ExplorerLinks } from '../components/ExplorerLinks';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { SkeletonBlock } from '../components/SkeletonLoader';
 import { parseTokenAmount, formatTokenAmount } from '../utils/format';
 import { LOCK_TIERS } from '../types/contracts';
 import type { LockTier } from '../types/contracts';
+
+const LP_POOL_ADDRESS = import.meta.env.VITE_LP_POOL_ADDRESS as string | undefined;
 
 interface PoolStats {
     totalDeposited: bigint;
@@ -26,6 +28,7 @@ export function LPPage(): React.ReactElement {
     const [statsLoading, setStatsLoading] = useState(false);
     const [simulating, setSimulating] = useState(false);
     const [actionType, setActionType] = useState<'deposit' | 'withdraw' | null>(null);
+    const [txStep, setTxStep] = useState<'idle' | 'approving' | 'depositing'>('idle');
 
     const loadStats = useCallback(async (): Promise<void> => {
         setStatsLoading(true);
@@ -62,6 +65,8 @@ export function LPPage(): React.ReactElement {
 
     const handleDeposit = useCallback(async (): Promise<void> => {
         if (!isConnected || !senderAddress || !walletAddress) return;
+        if (!LP_POOL_ADDRESS) return;
+
         let amount: bigint;
         try {
             amount = parseTokenAmount(depositAmount);
@@ -73,8 +78,29 @@ export function LPPage(): React.ReactElement {
         reset();
         setSimulating(true);
         setActionType('deposit');
+        setTxStep('approving');
 
         try {
+            // Step 1: increaseAllowance on MOTO token for the LPPool
+            const motoToken = getMotoTokenContract(senderAddress);
+            const allowanceResult = await motoToken.increaseAllowance(LP_POOL_ADDRESS, amount);
+
+            if (allowanceResult.revert) {
+                throw new Error(`Allowance failed: ${allowanceResult.revert}`);
+            }
+
+            setSimulating(false);
+            const allowanceTxHash = await send(allowanceResult);
+            if (!allowanceTxHash) {
+                setTxStep('idle');
+                setActionType(null);
+                return;
+            }
+
+            // Step 2: deposit
+            setSimulating(true);
+            setTxStep('depositing');
+
             const contract = getLPPoolContract(senderAddress);
             const callResult = await contract.deposit(amount, selectedTier);
 
@@ -90,6 +116,7 @@ export function LPPage(): React.ReactElement {
             setSimulating(false);
             console.error(err instanceof Error ? err.message : 'Deposit failed');
         }
+        setTxStep('idle');
         setActionType(null);
     }, [isConnected, senderAddress, walletAddress, depositAmount, selectedTier, send, reset, loadStats]);
 
@@ -121,6 +148,13 @@ export function LPPage(): React.ReactElement {
     const reserveRatio = poolStats && poolStats.totalDeposited > 0n
         ? Number((poolStats.availableBalance * 100n) / poolStats.totalDeposited)
         : null;
+
+    function getDepositButtonLabel(): string {
+        if (txStep === 'approving') return 'Step 1: Approving tokens...';
+        if (txStep === 'depositing') return 'Step 2: Depositing...';
+        if (isLoading && actionType === 'deposit') return 'Depositing...';
+        return 'Deposit';
+    }
 
     return (
         <main className="page">
@@ -214,6 +248,20 @@ export function LPPage(): React.ReactElement {
                     </div>
                 </div>
 
+                {txStep !== 'idle' && actionType === 'deposit' && (
+                    <div className="step-indicator">
+                        <div className={`step-indicator__step ${txStep === 'approving' ? 'step-indicator__step--active' : 'step-indicator__step--done'}`}>
+                            <span className="step-indicator__number">1</span>
+                            <span className="step-indicator__label">Approve tokens</span>
+                        </div>
+                        <div className="step-indicator__divider" />
+                        <div className={`step-indicator__step ${txStep === 'depositing' ? 'step-indicator__step--active' : ''}`}>
+                            <span className="step-indicator__number">2</span>
+                            <span className="step-indicator__label">Deposit</span>
+                        </div>
+                    </div>
+                )}
+
                 {txState.error && (
                     <ErrorBanner message={txState.error} onDismiss={reset} />
                 )}
@@ -224,7 +272,7 @@ export function LPPage(): React.ReactElement {
                     disabled={isLoading || !isConnected || !depositAmount}
                     type="button"
                 >
-                    {isLoading && actionType === 'deposit' ? 'Depositing...' : 'Deposit'}
+                    {getDepositButtonLabel()}
                 </button>
 
                 {txState.txHash && actionType === null && (

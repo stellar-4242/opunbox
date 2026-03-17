@@ -71,6 +71,14 @@ export interface ClaimAirdropResult extends ContractDecodedObjectResult {
 export type TypedCallResult<T extends ContractDecodedObjectResult> = CallResult<T>;
 
 // Contract interfaces
+export interface AllowanceResult extends ContractDecodedObjectResult {
+    success: boolean;
+}
+
+export interface IOP20TokenContract {
+    increaseAllowance(spender: unknown, amount: bigint): Promise<TypedCallResult<AllowanceResult>>;
+}
+
 export interface ICaseEngineContract {
     openCase(amount: bigint, userSeed: Uint8Array): Promise<TypedCallResult<OpenCaseResult>>;
     getPoolInfo(): Promise<TypedCallResult<GetPoolInfoResult>>;

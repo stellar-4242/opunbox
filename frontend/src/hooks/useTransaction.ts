@@ -40,11 +40,8 @@ export function useTransaction(walletAddress: string | null): {
                 network: net,
             };
 
-            const simulation = await callResult.simulate();
-            if (!simulation || !simulation.result) {
-                throw new Error('Transaction simulation failed — would revert on-chain');
-            }
-
+            // The CallResult is already the simulation output from getContract() method call.
+            // Revert detection is handled by the calling page before invoking send().
             const receipt = await callResult.sendTransaction(params);
             const txHash = receipt.transactionId;
             setState({ loading: false, error: null, txHash });

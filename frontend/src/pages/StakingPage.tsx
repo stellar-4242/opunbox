@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '../hooks/useWallet';
 import { useTransaction } from '../hooks/useTransaction';
-import { getCASAStakingContract } from '../services/contracts';
+import { getCASAStakingContract, getCasaTokenContract } from '../services/contracts';
 import { ExplorerLinks } from '../components/ExplorerLinks';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { SkeletonBlock } from '../components/SkeletonLoader';
 import { parseTokenAmount, formatTokenAmount } from '../utils/format';
+
+const CASA_STAKING_ADDRESS = import.meta.env.VITE_CASA_STAKING_ADDRESS as string | undefined;
 
 interface StakeInfo {
     staked: bigint;
@@ -27,6 +29,7 @@ export function StakingPage(): React.ReactElement {
     const [infoLoading, setInfoLoading] = useState(false);
     const [simulating, setSimulating] = useState(false);
     const [actionType, setActionType] = useState<'stake' | 'claim' | 'unstake' | null>(null);
+    const [txStep, setTxStep] = useState<'idle' | 'approving' | 'staking'>('idle');
     const [showUnstakeWarning, setShowUnstakeWarning] = useState(false);
 
     const loadInfo = useCallback(async (): Promise<void> => {
@@ -55,6 +58,8 @@ export function StakingPage(): React.ReactElement {
 
     const handleStake = useCallback(async (): Promise<void> => {
         if (!isConnected || !senderAddress || !walletAddress) return;
+        if (!CASA_STAKING_ADDRESS) return;
+
         let amount: bigint;
         try {
             amount = parseTokenAmount(stakeAmount);
@@ -66,8 +71,29 @@ export function StakingPage(): React.ReactElement {
         reset();
         setSimulating(true);
         setActionType('stake');
+        setTxStep('approving');
 
         try {
+            // Step 1: increaseAllowance on CASA token for the CASAStaking contract
+            const casaToken = getCasaTokenContract(senderAddress);
+            const allowanceResult = await casaToken.increaseAllowance(CASA_STAKING_ADDRESS, amount);
+
+            if (allowanceResult.revert) {
+                throw new Error(`Allowance failed: ${allowanceResult.revert}`);
+            }
+
+            setSimulating(false);
+            const allowanceTxHash = await send(allowanceResult);
+            if (!allowanceTxHash) {
+                setTxStep('idle');
+                setActionType(null);
+                return;
+            }
+
+            // Step 2: stake
+            setSimulating(true);
+            setTxStep('staking');
+
             const contract = getCASAStakingContract(senderAddress);
             const callResult = await contract.stake(amount);
 
@@ -83,6 +109,7 @@ export function StakingPage(): React.ReactElement {
             setSimulating(false);
             console.error(err instanceof Error ? err.message : 'Stake failed');
         }
+        setTxStep('idle');
         setActionType(null);
     }, [isConnected, senderAddress, walletAddress, stakeAmount, send, reset, loadInfo]);
 
@@ -132,6 +159,13 @@ export function StakingPage(): React.ReactElement {
     }, [isConnected, senderAddress, walletAddress, send, reset, loadInfo]);
 
     const isLoading = simulating || txState.loading;
+
+    function getStakeButtonLabel(): string {
+        if (txStep === 'approving') return 'Step 1: Approving tokens...';
+        if (txStep === 'staking') return 'Step 2: Staking...';
+        if (isLoading && actionType === 'stake') return 'Staking...';
+        return 'Stake $CASA';
+    }
 
     return (
         <main className="page">
@@ -241,6 +275,20 @@ export function StakingPage(): React.ReactElement {
                     />
                 </div>
 
+                {txStep !== 'idle' && actionType === 'stake' && (
+                    <div className="step-indicator">
+                        <div className={`step-indicator__step ${txStep === 'approving' ? 'step-indicator__step--active' : 'step-indicator__step--done'}`}>
+                            <span className="step-indicator__number">1</span>
+                            <span className="step-indicator__label">Approve tokens</span>
+                        </div>
+                        <div className="step-indicator__divider" />
+                        <div className={`step-indicator__step ${txStep === 'staking' ? 'step-indicator__step--active' : ''}`}>
+                            <span className="step-indicator__number">2</span>
+                            <span className="step-indicator__label">Stake</span>
+                        </div>
+                    </div>
+                )}
+
                 {txState.error && (
                     <ErrorBanner message={txState.error} onDismiss={reset} />
                 )}
@@ -251,7 +299,7 @@ export function StakingPage(): React.ReactElement {
                     disabled={isLoading || !isConnected || !stakeAmount}
                     type="button"
                 >
-                    {isLoading && actionType === 'stake' ? 'Staking...' : 'Stake $CASA'}
+                    {getStakeButtonLabel()}
                 </button>
 
                 {!isConnected && (
