@@ -35,6 +35,7 @@ const MULTI_DENOM: u64 = 1000;
 const RESERVE_BPS: u64 = 2000; // 20% reserve (out of 10000)
 const MIN_POOL_THRESHOLD: u256 = u256.fromString('1000000000000000000000'); // 1000 MOTO * 10^18
 const DECIMAL_BASE: u256 = u256.fromString('1000000000000000000'); // 10^18
+const MIN_DEPOSIT: u256 = u256.fromString('1000000000000000000'); // 1 MOTO (10^18)
 
 
 @final
@@ -105,6 +106,7 @@ export class LPPool extends OP_NET {
         const tier: u8 = calldata.readU8();
 
         if (amount.isZero()) throw new Revert('LPPool: deposit amount is zero');
+        if (u256.lt(amount, MIN_DEPOSIT)) throw new Revert('LPPool: deposit below minimum');
         if (tier > 2) throw new Revert('LPPool: invalid lock tier');
 
         // Transfer MOTO from caller

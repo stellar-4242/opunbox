@@ -33,6 +33,7 @@ const MULTI_7D: u64 = 1000;
 const MULTI_30D: u64 = 1300;
 const MULTI_90D: u64 = 1800;
 const DECIMAL_BASE: u256 = u256.fromString('1000000000000000000'); // 10^18
+const MIN_STAKE: u256 = u256.fromString('1000000000000000000'); // 1 CASA (10^18)
 
 
 @final
@@ -87,6 +88,7 @@ export class CASAStaking extends OP_NET {
 
         const amount: u256 = calldata.readU256();
         if (amount.isZero()) throw new Revert('CASAStaking: stake amount is zero');
+        if (u256.lt(amount, MIN_STAKE)) throw new Revert('CASAStaking: stake below minimum');
 
         // Transfer CASA from caller
         const casaAddr: Address = this.casaToken.value;
