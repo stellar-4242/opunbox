@@ -128,13 +128,6 @@ export class CaseEngine extends OP_NET {
         );
         if (u256.gt(betAmount, maxBet)) throw new Revert('CaseEngine: bet exceeds max bet cap');
 
-        // AUDIT FIX: Max payout = 5% of AVAILABLE balance
-        const availBal: u256 = this._getAvailablePoolBalance(lpPoolAddr);
-        const maxPayout: u256 = SafeMath.div(
-            SafeMath.mul(availBal, u256.fromU64(MAX_PAYOUT_BPS)),
-            u256.fromU64(10000),
-        );
-
         // CEI FIX (NEW-H4): Increment nonce BEFORE any external interaction
         const currentNonce: u256 = this.nonces.get(caller);
         const newNonce: u256 = SafeMath.add(currentNonce, u256.One);
@@ -168,6 +161,14 @@ export class CaseEngine extends OP_NET {
         this._transfer(motoAddr, lpPoolAddr, netToLP);
         this._addRevenueToPool(lpPoolAddr, netToLP);
 
+        // MEDIUM FIX: Compute maxPayout AFTER distributions so pool balance
+        // reflects the inflows just sent, avoiding false reverts.
+        const availBal: u256 = this._getAvailablePoolBalance(lpPoolAddr);
+        const maxPayout: u256 = SafeMath.div(
+            SafeMath.mul(availBal, u256.fromU64(MAX_PAYOUT_BPS)),
+            u256.fromU64(10000),
+        );
+
         // Determine payout multiplier from roll (CS2-style tiers)
         let multiplierNum: u64 = MULTI_BLUE; // default: blue (0.25x partial return)
         if (rollU64 < GOLD_THRESHOLD) {
@@ -181,14 +182,15 @@ export class CaseEngine extends OP_NET {
         }
         // else: blue tier — 0.25x partial return (always pays out something)
 
-        // All tiers pay out — blue returns 25% of bet from pool
-        const won: bool = true;
-
         // Payout = betAmount * multiplierNum / MULTI_DENOM
         const payout: u256 = SafeMath.div(
             SafeMath.mul(betAmount, u256.fromU64(multiplierNum)),
             u256.fromU64(MULTI_DENOM),
         );
+
+        // won = true iff payout >= betAmount (player breaks even or profits)
+        // Blue (0.25x) is a net loss; purple (2x) and above are wins.
+        const won: bool = u256.ge(payout, betAmount);
 
         if (u256.gt(payout, maxPayout)) {
             throw new Revert('CaseEngine: payout exceeds max payout cap');
@@ -225,7 +227,7 @@ export class CaseEngine extends OP_NET {
         const treasuryAddr: Address = this.treasury.value;
 
         // LP 60%
-        const lpShare: u256 = SafeMath.div(
+        let lpShare: u256 = SafeMath.div(
             SafeMath.mul(houseEdge, u256.fromU64(LP_SHARE_BPS)),
             u256.fromU64(10000),
         );
@@ -239,20 +241,41 @@ export class CaseEngine extends OP_NET {
         // Treasury 10% (remainder avoids rounding dust)
         const treasuryShare: u256 = SafeMath.sub(houseEdge, SafeMath.add(lpShare, stakingShare));
 
+        // HIGH FIX: If no stakers exist, redirect the staking share to the LP pool
+        // to prevent MOTO from being permanently trapped in the staking contract.
+        let resolvedStakingShare: u256 = stakingShare;
+        if (!stakingShare.isZero() && !stakingAddr.isZero()) {
+            const hasStakers: bool = this._stakingHasStakers(stakingAddr);
+            if (!hasStakers) {
+                // Redirect: merge staking share into LP share
+                lpShare = SafeMath.add(lpShare, stakingShare);
+                resolvedStakingShare = u256.Zero;
+            }
+        }
+
         // AUDIT FIX: Revenue distribution mustSucceed=TRUE
         if (!lpShare.isZero()) {
             this._transfer(motoAddr, lpPoolAddr, lpShare);
             this._addRevenueToPool(lpPoolAddr, lpShare);
         }
 
-        if (!stakingShare.isZero() && !stakingAddr.isZero()) {
-            this._transfer(motoAddr, stakingAddr, stakingShare);
-            this._addRevenueToStaking(stakingAddr, stakingShare);
+        if (!resolvedStakingShare.isZero() && !stakingAddr.isZero()) {
+            this._transfer(motoAddr, stakingAddr, resolvedStakingShare);
+            this._addRevenueToStaking(stakingAddr, resolvedStakingShare);
         }
 
         if (!treasuryShare.isZero() && !treasuryAddr.isZero()) {
             this._transfer(motoAddr, treasuryAddr, treasuryShare);
         }
+    }
+
+    private _stakingHasStakers(stakingAddr: Address): bool {
+        const sel: u32 = encodeSelector('getTotalWeightedStake()');
+        const cd = new BytesWriter(4);
+        cd.writeSelector(sel);
+        const result = Blockchain.call(stakingAddr, cd, true);
+        const totalWS: u256 = result.data.readU256();
+        return !totalWS.isZero();
     }
 
     // AUDIT FIX: hash includes callerAddress + per-address nonce

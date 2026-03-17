@@ -234,6 +234,7 @@ export class LPPool extends OP_NET {
     @returns({ name: 'success', type: ABIDataTypes.BOOL })
     public pullPayout(calldata: Calldata): BytesWriter {
         const caller: Address = Blockchain.tx.sender;
+        if (this.caseEngine.value.isZero()) throw new Revert('LPPool: not configured');
         if (!caller.equals(this.caseEngine.value)) {
             throw new Revert('LPPool: only CaseEngine can pull payouts');
         }
@@ -268,6 +269,7 @@ export class LPPool extends OP_NET {
     @returns({ name: 'success', type: ABIDataTypes.BOOL })
     public addRevenue(calldata: Calldata): BytesWriter {
         const caller: Address = Blockchain.tx.sender;
+        if (this.caseEngine.value.isZero()) throw new Revert('LPPool: not configured');
         if (!caller.equals(this.caseEngine.value)) {
             throw new Revert('LPPool: only CaseEngine can add revenue');
         }
@@ -275,10 +277,11 @@ export class LPPool extends OP_NET {
         const amount: u256 = calldata.readU256();
         if (amount.isZero()) throw new Revert('LPPool: revenue amount is zero');
 
-        // NEW-C2 FIX: Do NOT increment totalDeposited here.
-        // Physical MOTO was already transferred to this contract by _transfer() in CaseEngine.
-        // addRevenue() ONLY updates the revenuePerShare accumulator for LP reward distribution.
-        // totalDeposited is only modified in deposit(), withdraw(), and pullPayout().
+        // Track the MOTO that physically entered the pool via _transfer() in CaseEngine.
+        // Both the physical transfer and this ledger update must happen together:
+        // physical MOTO moves into the contract, totalDeposited reflects it so
+        // _getAvailableBalance() and pullPayout() remain consistent over time.
+        this.totalDeposited.value = SafeMath.add(this.totalDeposited.value, amount);
 
         // Distribute to LPs via revenuePerShare accumulator
         const totalShares: u256 = this.totalWeightedShares.value;

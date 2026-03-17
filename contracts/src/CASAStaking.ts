@@ -212,6 +212,7 @@ export class CASAStaking extends OP_NET {
     @returns({ name: 'success', type: ABIDataTypes.BOOL })
     public addRevenueShare(calldata: Calldata): BytesWriter {
         const caller: Address = Blockchain.tx.sender;
+        if (this.caseEngine.value.isZero()) throw new Revert('CASAStaking: not configured');
         if (!caller.equals(this.caseEngine.value)) {
             throw new Revert('CASAStaking: only CaseEngine can add revenue');
         }
@@ -233,6 +234,15 @@ export class CASAStaking extends OP_NET {
 
         const w = new BytesWriter(1);
         w.writeBoolean(true);
+        return w;
+    }
+
+    // getTotalWeightedStake() — view (used by CaseEngine to check if stakers exist)
+    @method()
+    @returns({ name: 'total', type: ABIDataTypes.UINT256 })
+    public getTotalWeightedStake(_calldata: Calldata): BytesWriter {
+        const w = new BytesWriter(32);
+        w.writeU256(this.totalWeightedStake.value);
         return w;
     }
 
