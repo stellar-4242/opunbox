@@ -1,0 +1,40 @@
+{
+    "functions": [
+        {
+            "name": "openCase",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "amount",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "userSeed",
+                    "type": "BYTES32"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "won",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
+            "name": "getPoolInfo",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "totalDeposited",
+                    "type": "UINT256"
+                }
+            ]
+        }
+    ],
+    "events": []
+}

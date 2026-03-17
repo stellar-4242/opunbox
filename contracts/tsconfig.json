@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "CommonJS",
+        "moduleResolution": "node",
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "lib": ["ES2022"],
+        "baseUrl": ".",
+        "paths": {
+            "@btc-vision/btc-runtime/runtime": ["node_modules/@btc-vision/btc-runtime/runtime/index.d.ts"]
+        }
+    },
+    "include": ["src/**/*.ts", "tests/**/*.ts", "types/**/*.d.ts"],
+    "exclude": ["node_modules", "build"]
+}

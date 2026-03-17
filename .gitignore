@@ -6,3 +6,4 @@ build/*.wasm
 !.env.example
 .DS_Store
 *.log
+CLAUDE.md

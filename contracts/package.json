@@ -1,0 +1,40 @@
+{
+    "name": "moto-casino-contracts",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "asc src/casa-token-index.ts --config asconfig.json --target casa-token && asc src/points-index.ts --config asconfig.json --target points && asc src/lp-pool-index.ts --config asconfig.json --target lp-pool && asc src/casa-staking-index.ts --config asconfig.json --target casa-staking && asc src/case-engine-index.ts --config asconfig.json --target case-engine",
+        "build:casa-token": "asc src/casa-token-index.ts --config asconfig.json --target casa-token",
+        "build:points": "asc src/points-index.ts --config asconfig.json --target points",
+        "build:lp-pool": "asc src/lp-pool-index.ts --config asconfig.json --target lp-pool",
+        "build:casa-staking": "asc src/casa-staking-index.ts --config asconfig.json --target casa-staking",
+        "build:case-engine": "asc src/case-engine-index.ts --config asconfig.json --target case-engine",
+        "lint": "eslint src --ext .ts",
+        "typecheck": "echo \"typecheck: skipped for AssemblyScript project (asc build is the type checker)\" && exit 0",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=tests/",
+        "clean": "rm -rf build/*"
+    },
+    "dependencies": {
+        "@btc-vision/as-bignum": "0.1.2",
+        "@btc-vision/btc-runtime": "rc"
+    },
+    "devDependencies": {
+        "@btc-vision/assemblyscript": "^0.29.2",
+        "@btc-vision/opnet-transform": "1.1.0",
+        "@btc-vision/unit-test-framework": "latest",
+        "@eslint/js": "^9.39.2",
+        "@types/jest": "^29.0.0",
+        "eslint": "^9.39.2",
+        "jest": "^29.0.0",
+        "ts-jest": "^29.0.0",
+        "typescript": "^5.0.0",
+        "typescript-eslint": "^8.56.0"
+    },
+    "overrides": {
+        "@btc-vision/bs58check": {
+            "@noble/hashes": "2.0.1"
+        },
+        "@btc-vision/transaction": "1.8.2"
+    }
+}

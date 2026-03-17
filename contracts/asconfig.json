@@ -1,0 +1,50 @@
+{
+    "targets": {
+        "casa-token": {
+            "outFile": "build/CASAToken.wasm",
+            "entry": "src/casa-token-index.ts",
+            "use": ["abort=src/casa-token-index/abort"]
+        },
+        "points": {
+            "outFile": "build/Points.wasm",
+            "entry": "src/points-index.ts",
+            "use": ["abort=src/points-index/abort"]
+        },
+        "lp-pool": {
+            "outFile": "build/LPPool.wasm",
+            "entry": "src/lp-pool-index.ts",
+            "use": ["abort=src/lp-pool-index/abort"]
+        },
+        "casa-staking": {
+            "outFile": "build/CASAStaking.wasm",
+            "entry": "src/casa-staking-index.ts",
+            "use": ["abort=src/casa-staking-index/abort"]
+        },
+        "case-engine": {
+            "outFile": "build/CaseEngine.wasm",
+            "entry": "src/case-engine-index.ts",
+            "use": ["abort=src/case-engine-index/abort"]
+        }
+    },
+    "options": {
+        "sourceMap": false,
+        "optimizeLevel": 3,
+        "shrinkLevel": 1,
+        "converge": true,
+        "noAssert": false,
+        "enable": [
+            "sign-extension",
+            "mutable-globals",
+            "nontrapping-f2i",
+            "bulk-memory",
+            "simd",
+            "reference-types",
+            "multi-value"
+        ],
+        "runtime": "stub",
+        "memoryBase": 0,
+        "initialMemory": 1,
+        "exportStart": "start",
+        "transform": "@btc-vision/opnet-transform"
+    }
+}
