@@ -157,16 +157,15 @@ export class Points extends OP_NET {
         // CEI: mark claimed BEFORE cross-contract call
         this.airdropClaimed.set(caller, u256.One);
 
-        // Mint CASA (optional — mustSucceed=false since this is optional)
+        // Mint CASA — mustSucceed=true so user doesn't lose their airdrop if mint fails
         const casaAddr: Address = this.casaTokenAddress.value;
-        if (!casaAddr.isZero()) {
-            const mintSelector: u32 = encodeSelector('mint(address,uint256)');
-            const mintCalldata = new BytesWriter(4 + 32 + 32);
-            mintCalldata.writeSelector(mintSelector);
-            mintCalldata.writeAddress(caller);
-            mintCalldata.writeU256(allocation);
-            Blockchain.call(casaAddr, mintCalldata, false);
-        }
+        if (casaAddr.isZero()) throw new Revert('Points: CASA token not configured');
+        const mintSelector: u32 = encodeSelector('mint(address,uint256)');
+        const mintCalldata = new BytesWriter(4 + 32 + 32);
+        mintCalldata.writeSelector(mintSelector);
+        mintCalldata.writeAddress(caller);
+        mintCalldata.writeU256(allocation);
+        Blockchain.call(casaAddr, mintCalldata, true);
 
         const w = new BytesWriter(32);
         w.writeU256(allocation);
@@ -226,7 +225,14 @@ export class Points extends OP_NET {
         // Credit referrer 10% bonus
         const referrerU256: u256 = this.referrers.get(recipient);
         if (!referrerU256.isZero()) {
-            const referrerBytes: Uint8Array = referrerU256.toUint8Array(true);
+            // Safe round-trip: u256.toUint8Array(true) returns big-endian bytes.
+            // Pad to 32 bytes if shorter to ensure Address.fromUint8Array gets full address.
+            const rawBytes: Uint8Array = referrerU256.toUint8Array(true);
+            const referrerBytes: Uint8Array = new Uint8Array(32);
+            const offset: i32 = 32 - rawBytes.length;
+            for (let i: i32 = 0; i < rawBytes.length; i++) {
+                referrerBytes[offset + i] = rawBytes[i];
+            }
             const referrerAddr: Address = Address.fromUint8Array(referrerBytes);
             if (!referrerAddr.isZero()) {
                 const bonus: u256 = SafeMath.div(

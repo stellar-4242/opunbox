@@ -141,7 +141,9 @@ export class CaseEngine extends OP_NET {
         this._transferFrom(motoAddr, caller, Blockchain.contractAddress, betAmount);
 
         // RNG: sha256(blockHash + userSeed + callerAddress + perAddressNonce)
-        const blockHash: Uint8Array = Blockchain.getBlockHash(Blockchain.block.number - 1);
+        const currentBlock: u64 = Blockchain.block.number;
+        if (currentBlock == 0) throw new Revert('CaseEngine: no prior block');
+        const blockHash: Uint8Array = Blockchain.getBlockHash(currentBlock - 1);
         const randomValue: u256 = this._computeRandom(blockHash, userSeed, caller, newNonce);
 
         // roll = randomValue % 10000
