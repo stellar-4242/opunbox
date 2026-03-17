@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/*.wasm
+*.env
+.env.*
+!.env.example
+.DS_Store
+*.log
