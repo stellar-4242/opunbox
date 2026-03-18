@@ -138,8 +138,13 @@ export class CASAToken extends OP20 {
         const elapsed: u64 = currentBlock - deployBlock;
         const halvings: u64 = elapsed / HALVING_INTERVAL;
 
+        // Cap loop at 64 iterations — rate reaches 0 well before this (after ~10 halvings
+        // with initial rate 1000). Explicit cap satisfies Bob's C-04 (no unbounded loops).
+        const MAX_HALVINGS: u64 = 64;
+        const cappedHalvings: u64 = halvings < MAX_HALVINGS ? halvings : MAX_HALVINGS;
+
         let rate: u256 = this.initialEmissionRate.value;
-        for (let i: u64 = 0; i < halvings; i++) {
+        for (let i: u64 = 0; i < cappedHalvings; i++) {
             if (rate.isZero()) break;
             rate = SafeMath.div(rate, u256.fromU64(2));
         }

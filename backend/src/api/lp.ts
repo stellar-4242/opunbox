@@ -27,8 +27,8 @@ export function registerLpRoutes(app: HyperExpress.Server): void {
         }
 
         const address = req.path_parameters['address'];
-        if (!address) {
-            res.status(400).json({ success: false, error: 'Missing address parameter' });
+        if (!address || !/^[a-fA-F0-9]{1,128}$/.test(address)) {
+            res.status(400).json({ success: false, error: 'Invalid address parameter' });
             return;
         }
 
