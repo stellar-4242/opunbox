@@ -266,7 +266,32 @@ export class LPPool extends OP_NET {
         return w;
     }
 
+    // addPrincipal(uint256) — CaseEngine only
+    // Tracks net bet principal flowing into the pool (NOT distributed as LP revenue).
+    // Only increments totalDeposited so the pool ledger stays in sync with actual MOTO held.
+    @method({ name: 'amount', type: ABIDataTypes.UINT256 })
+    @returns({ name: 'success', type: ABIDataTypes.BOOL })
+    public addPrincipal(calldata: Calldata): BytesWriter {
+        const caller: Address = Blockchain.tx.sender;
+        if (this.caseEngine.value.isZero()) throw new Revert('LPPool: not configured');
+        if (!caller.equals(this.caseEngine.value)) {
+            throw new Revert('LPPool: only CaseEngine can add principal');
+        }
+
+        const amount: u256 = calldata.readU256();
+        if (amount.isZero()) throw new Revert('LPPool: principal amount is zero');
+
+        // Track pool working capital — NOT distributed to LPs via revenuePerShare
+        this.totalDeposited.value = SafeMath.add(this.totalDeposited.value, amount);
+
+        const w = new BytesWriter(1);
+        w.writeBoolean(true);
+        return w;
+    }
+
     // addRevenue(uint256) — CaseEngine only
+    // Tracks actual LP revenue (house edge LP share). Increments totalDeposited AND
+    // distributes to LPs via revenuePerShare accumulator.
     @method({ name: 'amount', type: ABIDataTypes.UINT256 })
     @returns({ name: 'success', type: ABIDataTypes.BOOL })
     public addRevenue(calldata: Calldata): BytesWriter {
@@ -279,13 +304,10 @@ export class LPPool extends OP_NET {
         const amount: u256 = calldata.readU256();
         if (amount.isZero()) throw new Revert('LPPool: revenue amount is zero');
 
-        // Track the MOTO that physically entered the pool via _transfer() in CaseEngine.
-        // Both the physical transfer and this ledger update must happen together:
-        // physical MOTO moves into the contract, totalDeposited reflects it so
-        // _getAvailableBalance() and pullPayout() remain consistent over time.
+        // Track the MOTO that physically entered the pool
         this.totalDeposited.value = SafeMath.add(this.totalDeposited.value, amount);
 
-        // Distribute to LPs via revenuePerShare accumulator
+        // Distribute ONLY house edge LP share to LPs via revenuePerShare
         const totalShares: u256 = this.totalWeightedShares.value;
         if (!totalShares.isZero()) {
             const delta: u256 = SafeMath.div(

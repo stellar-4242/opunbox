@@ -162,9 +162,10 @@ export class CaseEngine extends OP_NET {
         // Distribute house edge (60% LP / 30% staking / 10% treasury)
         this._distributeHouseEdge(houseEdge, lpPoolAddr);
 
-        // Transfer net bet to LP pool — principal always goes in
+        // Transfer net bet to LP pool — principal (NOT revenue for LPs).
+        // Use addPrincipal (not addRevenue) so revenuePerShare is not inflated.
         this._transfer(motoAddr, lpPoolAddr, netToLP);
-        this._addRevenueToPool(lpPoolAddr, netToLP);
+        this._addPrincipalToPool(lpPoolAddr, netToLP);
 
         // MEDIUM FIX: Compute maxPayout AFTER distributions so pool balance
         // reflects the inflows just sent, avoiding false reverts.
@@ -355,12 +356,19 @@ export class CaseEngine extends OP_NET {
         Blockchain.call(lpPool, cd, true);
     }
 
+    private _addPrincipalToPool(lpPool: Address, amount: u256): void {
+        const sel: u32 = encodeSelector('addPrincipal(uint256)');
+        const cd = new BytesWriter(4 + 32);
+        cd.writeSelector(sel);
+        cd.writeU256(amount);
+        Blockchain.call(lpPool, cd, true);
+    }
+
     private _addRevenueToPool(lpPool: Address, amount: u256): void {
         const sel: u32 = encodeSelector('addRevenue(uint256)');
         const cd = new BytesWriter(4 + 32);
         cd.writeSelector(sel);
         cd.writeU256(amount);
-        // AUDIT FIX: mustSucceed=TRUE
         Blockchain.call(lpPool, cd, true);
     }
 

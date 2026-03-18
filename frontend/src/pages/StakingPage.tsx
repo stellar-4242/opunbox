@@ -185,7 +185,7 @@ export function StakingPage(): React.ReactElement {
                         </div>
                     ))}
                 </div>
-                <p className="form-hint">Unstaking resets your multiplier to 1.0x</p>
+                <p className="form-hint">Unstaking resets your multiplier. You will have a 7-day warmup before earning rewards again.</p>
             </div>
 
             {senderAddress && (
