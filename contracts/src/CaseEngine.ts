@@ -14,9 +14,9 @@ import { u256 } from '@btc-vision/as-bignum/assembly';
 
 // Case Engine — orchestrator
 // AUDIT FIXES:
-// - Per-address nonce (NOT global). Include caller address + nonce in hash.
-//   hash(blockHash + userSeed + callerAddress + perAddressNonce)
-//   Nonce incremented BEFORE hash computation
+// - RNG uses Blockchain.block.hash (CURRENT block hash, unpredictable to player)
+//   hash(currentBlockHash + userSeed + callerAddress + perAddressNonce)
+//   Per-address nonce incremented BEFORE hash computation
 // - Max bet = 1% of TOTAL pool; max payout = 5% of AVAILABLE balance
 // - Revenue distribution Blockchain.calls use mustSucceed=TRUE
 // - Optional side-effects (points, CASA) use mustSucceed=false
@@ -144,10 +144,11 @@ export class CaseEngine extends OP_NET {
         const motoAddr: Address = this.motoToken.value;
         this._transferFrom(motoAddr, caller, Blockchain.contractAddress, betAmount);
 
-        // RNG: sha256(blockHash + userSeed + callerAddress + perAddressNonce)
-        const currentBlock: u64 = Blockchain.block.number;
-        if (currentBlock == 0) throw new Revert('CaseEngine: no prior block');
-        const blockHash: Uint8Array = Blockchain.getBlockHash(currentBlock - 1);
+        // RNG: sha256(currentBlockHash + userSeed + callerAddress + perAddressNonce)
+        // Uses Blockchain.block.hash (CURRENT block hash) — player cannot predict this
+        // because it depends on the mining nonce and all other transactions in the block.
+        // Only miners could game this, but Bitcoin mining competition makes it uneconomical.
+        const blockHash: Uint8Array = Blockchain.block.hash;
         const randomValue: u256 = this._computeRandom(blockHash, userSeed, caller, newNonce);
 
         // roll = randomValue % 10000
