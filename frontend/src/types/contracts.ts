@@ -111,6 +111,7 @@ export interface IPointsContract {
 
 export interface CaseResult {
     won: boolean;
+    payout: bigint;
     txHash: string;
     amount: bigint;
     timestamp: number;

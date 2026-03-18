@@ -124,7 +124,7 @@ export function StatsPage(): React.ReactElement {
                 <h2 className="card__title">Protocol Rules</h2>
                 <ul className="info-list">
                     <li>Max bet capped at 1% of total LP pool</li>
-                    <li>Max payout capped at 5% of total LP pool</li>
+                    <li>Max payout capped at 5% of available LP balance</li>
                     <li>20% reserve ratio always maintained</li>
                     <li>Cases revert if pool is below minimum threshold</li>
                     <li>RNG: hash(blockhash + userSeed + nonce) per transaction</li>

@@ -28,7 +28,7 @@ export function CasePage(): React.ReactElement {
     const [seedError, setSeedError] = useState('');
     const [simulating, setSimulating] = useState(false);
     const [txStep, setTxStep] = useState<'idle' | 'approving' | 'opening'>('idle');
-    const [lastResult, setLastResult] = useState<{ won: boolean } | null>(null);
+    const [lastResult, setLastResult] = useState<{ won: boolean; payout: bigint } | null>(null);
     const [history, setHistory] = useState<CaseResult[]>([]);
     const [poolTotal, setPoolTotal] = useState<bigint | null>(null);
     const [poolLoading, setPoolLoading] = useState(false);
@@ -121,13 +121,15 @@ export function CasePage(): React.ReactElement {
             }
 
             const won = callResult.properties.won;
+            const payout = (callResult.properties.payout as bigint) ?? 0n;
             setSimulating(false);
             const txHash = await send(callResult);
 
             if (txHash) {
-                setLastResult({ won });
+                setLastResult({ won, payout });
                 const entry: CaseResult = {
                     won,
+                    payout,
                     txHash,
                     amount,
                     timestamp: Date.now(),
@@ -276,6 +278,9 @@ export function CasePage(): React.ReactElement {
                     <div className="result-reveal__label">
                         {lastResult.won ? 'WIN' : 'LOSS'}
                     </div>
+                    <div className="result-reveal__payout">
+                        Payout: {formatTokenAmount(lastResult.payout)} MOTO
+                    </div>
                     {txState.txHash && (
                         <ExplorerLinks txHash={txState.txHash} label="Case Transaction" />
                     )}
@@ -292,7 +297,7 @@ export function CasePage(): React.ReactElement {
                                     {entry.won ? 'WIN' : 'LOSS'}
                                 </span>
                                 <span className="history-item__amount tabular">
-                                    {formatTokenAmount(entry.amount)} $MOTO
+                                    Bet: {formatTokenAmount(entry.amount)} → Payout: {formatTokenAmount(entry.payout)} $MOTO
                                 </span>
                                 <div className="history-item__links">
                                     <ExplorerLinks txHash={entry.txHash} label="" />
