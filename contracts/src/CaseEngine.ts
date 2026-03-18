@@ -36,7 +36,7 @@ const MAX_PAYOUT_BPS: u64 = 500;    // 5% of available balance
 // Pink (Classified)      | [90,  409]    |  3.20%      |  6x        | 0.192
 // Purple (Restricted)    | [410, 2007]   | 15.98%      |  2x        | 0.320
 // Blue (Mil-Spec)        | [2008, 9999]  | 79.92%      |  0.25x     | 0.200
-// Total EV = 0.950 = 95% RTP
+// Total EV = 0.9494 ≈ 95% RTP (house edge ~5.06%)
 const GOLD_THRESHOLD: u64 = 26;      // 0-25 = gold (0.26%)
 const RED_THRESHOLD: u64 = 90;       // 26-89 = red (0.64%)
 const PINK_THRESHOLD: u64 = 410;     // 90-409 = pink (3.2%)
@@ -376,14 +376,32 @@ export class CaseEngine extends OP_NET {
     private _mintCASAForPlayer(to: Address, betAmount: u256): void {
         const casaAddr: Address = this.casaToken.value;
         if (casaAddr.isZero()) return;
-        const emission: u256 = SafeMath.div(betAmount, u256.fromU64(1000));
+
+        // Query CASAToken for current emission rate (no boost — only LPs get the 3x early boost)
+        const rateSel: u32 = encodeSelector('getEmissionRate()');
+        const rateCalldata = new BytesWriter(4);
+        rateCalldata.writeSelector(rateSel);
+        const rateResult = Blockchain.call(casaAddr, rateCalldata, false);
+        if (!rateResult.success) return;
+
+        const rate: u256 = rateResult.data.readU256();
+        if (rate.isZero()) return;
+
+        // emission = betAmount * rate / EMISSION_DENOM
+        // EMISSION_DENOM = 1_000_000: with initial rate=1000, emission = betAmount / 1000
+        // After first halving rate=500, emission = betAmount / 2000
+        const emission: u256 = SafeMath.div(
+            SafeMath.mul(betAmount, rate),
+            u256.fromU64(1_000_000),
+        );
         if (emission.isZero()) return;
-        const sel: u32 = encodeSelector('mint(address,uint256)');
+
+        const mintSel: u32 = encodeSelector('mint(address,uint256)');
         const cd = new BytesWriter(4 + 32 + 32);
-        cd.writeSelector(sel);
+        cd.writeSelector(mintSel);
         cd.writeAddress(to);
         cd.writeU256(emission);
-        // AUDIT FIX: Optional side-effect — mustSucceed=false
+        // Optional side-effect — mustSucceed=false
         Blockchain.call(casaAddr, cd, false);
     }
 

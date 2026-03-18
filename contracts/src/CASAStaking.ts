@@ -26,6 +26,7 @@ import { u256 } from '@btc-vision/as-bignum/assembly';
 // - _checkpointWeightedStake() updates totalWeightedStake when tier changes
 // - Checkpoint called at start of unstake() and claimRewards()
 
+const BLOCKS_7D: u64 = 1008;
 const BLOCKS_30D: u64 = 4320;
 const BLOCKS_90D: u64 = 12960;
 const MULTI_DENOM: u64 = 1000;
@@ -317,13 +318,14 @@ export class CASAStaking extends OP_NET {
 
     private _getCurrentMultiplier(user: Address): u64 {
         const stakedAtU256: u256 = this.stakeBlock.get(user);
-        if (stakedAtU256.isZero()) return MULTI_7D;
+        if (stakedAtU256.isZero()) return 0; // no multiplier if not staked
 
         const stakedAt: u64 = stakedAtU256.toU64();
         const currentBlock: u64 = Blockchain.block.number;
-        if (currentBlock < stakedAt) return MULTI_7D;
+        if (currentBlock < stakedAt) return 0;
 
         const elapsed: u64 = currentBlock - stakedAt;
+        if (elapsed < BLOCKS_7D) return 0; // warmup: no multiplier for first 7 days
         if (elapsed >= BLOCKS_90D) return MULTI_90D;
         if (elapsed >= BLOCKS_30D) return MULTI_30D;
         return MULTI_7D;

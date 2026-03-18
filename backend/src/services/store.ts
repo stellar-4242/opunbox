@@ -218,9 +218,13 @@ class Store {
             });
         }
 
-        this.leaderboardEntries.sort((a, b) =>
-            Number(BigInt(b.totalWagered) - BigInt(a.totalWagered)),
-        );
+        this.leaderboardEntries.sort((a, b) => {
+            const aVal = BigInt(a.totalWagered);
+            const bVal = BigInt(b.totalWagered);
+            if (bVal > aVal) return 1;
+            if (bVal < aVal) return -1;
+            return 0;
+        });
         this.leaderboardEntries.forEach((entry, idx) => {
             entry.rank = idx + 1;
         });

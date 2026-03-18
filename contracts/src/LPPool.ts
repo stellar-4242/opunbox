@@ -395,11 +395,29 @@ export class LPPool extends OP_NET {
     private _mintCASAForLP(to: Address, amount: u256): void {
         const casaAddr: Address = this.casaToken.value;
         if (casaAddr.isZero()) return;
-        const emission: u256 = SafeMath.div(amount, u256.fromU64(1000));
+
+        // Query CASAToken for boost-aware emission rate (includes 3x early LP boost)
+        const rateSel: u32 = encodeSelector('computeEmissionWithBoost()');
+        const rateCalldata = new BytesWriter(4);
+        rateCalldata.writeSelector(rateSel);
+        const rateResult = Blockchain.call(casaAddr, rateCalldata, false);
+        if (!rateResult.success) return;
+
+        const rate: u256 = rateResult.data.readU256();
+        if (rate.isZero()) return;
+
+        // emission = amount * rate / EMISSION_DENOM
+        // EMISSION_DENOM = 1_000_000: with initial rate=1000, emission = amount * 1000 / 1_000_000 = amount / 1000
+        // With 3x early boost rate=3000, emission = amount * 3000 / 1_000_000 = amount * 3 / 1000
+        const emission: u256 = SafeMath.div(
+            SafeMath.mul(amount, rate),
+            u256.fromU64(1_000_000),
+        );
         if (emission.isZero()) return;
-        const sel: u32 = encodeSelector('mint(address,uint256)');
+
+        const mintSel: u32 = encodeSelector('mint(address,uint256)');
         const cd = new BytesWriter(4 + 32 + 32);
-        cd.writeSelector(sel);
+        cd.writeSelector(mintSel);
         cd.writeAddress(to);
         cd.writeU256(emission);
         Blockchain.call(casaAddr, cd, false);
