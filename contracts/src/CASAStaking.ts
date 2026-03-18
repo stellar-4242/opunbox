@@ -95,19 +95,22 @@ export class CASAStaking extends OP_NET {
         const casaAddr: Address = this.casaToken.value;
         this._transferFrom(casaAddr, caller, Blockchain.contractAddress, amount);
 
-        // Checkpoint existing stake before adding more
+        // Settle existing stake before adding more
         const existing: u256 = this.stakeAmount.get(caller);
         if (!existing.isZero()) {
+            // Compute pending FIRST using OLD weighted snapshot, BEFORE checkpoint overwrites it
+            const pending: u256 = this._computePending(caller);
+
+            // NOW checkpoint — updates stakeWeightedSnapshot to new multiplier weight
             this._checkpointWeightedStake(caller);
 
-            // Pay out pending rewards BEFORE resetting the snapshot so they are not forfeited
-            const pending: u256 = this._computePending(caller);
+            // Pay out accumulated rewards
             if (!pending.isZero()) {
                 const motoAddr: Address = this.motoToken.value;
                 this._transfer(motoAddr, caller, pending);
             }
 
-            // NOW safe to advance snapshot — pending has been paid
+            // Advance revenue snapshot — pending has been paid
             this.stakeRevenueSnapshot.set(caller, this.revenuePerWeightedStake.value);
         }
 
@@ -157,10 +160,11 @@ export class CASAStaking extends OP_NET {
         const staked: u256 = this.stakeAmount.get(caller);
         if (staked.isZero()) throw new Revert('CASAStaking: no stake found');
 
-        // AUDIT FIX: Checkpoint at start of unstake
-        this._checkpointWeightedStake(caller);
-
+        // Compute pending FIRST using OLD weighted snapshot, BEFORE checkpoint overwrites it
         const pending: u256 = this._computePending(caller);
+
+        // NOW checkpoint — updates stakeWeightedSnapshot to new multiplier weight
+        this._checkpointWeightedStake(caller);
 
         // CEI: remove from totalWeightedStake — strict sub reverts on underflow to surface bugs
         const userWeighted: u256 = this.stakeWeightedSnapshot.get(caller);
@@ -197,11 +201,12 @@ export class CASAStaking extends OP_NET {
         const staked: u256 = this.stakeAmount.get(caller);
         if (staked.isZero()) throw new Revert('CASAStaking: no stake found');
 
-        // AUDIT FIX: Checkpoint at start of claimRewards
-        this._checkpointWeightedStake(caller);
-
+        // Compute pending FIRST using OLD weighted snapshot, BEFORE checkpoint overwrites it
         const pending: u256 = this._computePending(caller);
         if (pending.isZero()) throw new Revert('CASAStaking: no rewards to claim');
+
+        // NOW checkpoint — updates stakeWeightedSnapshot to new multiplier weight
+        this._checkpointWeightedStake(caller);
 
         // CEI: update snapshot before transfer
         this.stakeRevenueSnapshot.set(caller, this.revenuePerWeightedStake.value);
