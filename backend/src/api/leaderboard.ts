@@ -52,7 +52,11 @@ export function registerLeaderboardRoutes(app: HyperExpress.Server): void {
             }
 
             entries = Array.from(volumeByAddress.entries())
-                .sort(([, a], [, b]) => Number(b - a))
+                .sort(([, a], [, b]) => {
+                    if (b > a) return 1;
+                    if (b < a) return -1;
+                    return 0;
+                })
                 .slice(0, limit)
                 .map(([address, totalWagered], idx): LeaderboardEntry => ({
                     rank: idx + 1,

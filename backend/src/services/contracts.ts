@@ -88,6 +88,11 @@ export const LP_POOL_ABI: BitcoinInterfaceAbi = LP_POOL_ABI_DEF;
 export const CASA_STAKING_ABI: BitcoinInterfaceAbi = CASA_STAKING_ABI_DEF;
 export const POINTS_ABI: BitcoinInterfaceAbi = POINTS_ABI_DEF;
 
+// ─── Active network (driven by NETWORK env var) ───────────────────────────────
+
+const NETWORK_NAME = process.env['NETWORK'] ?? 'testnet';
+const ACTIVE_NETWORK = NETWORK_NAME === 'mainnet' ? networks.bitcoin : networks.opnetTestnet;
+
 // ─── Environment helpers ───────────────────────────────────────────────────────
 
 function requireEnv(key: string): string {
@@ -162,10 +167,10 @@ export function getCaseEngineContract(): ContractInstance {
     const address = getCaseEngineAddress();
     const key = `case-engine-${address}`;
     if (!contractCache.has(key)) {
-        const provider = getProvider(networks.opnetTestnet);
+        const provider = getProvider(ACTIVE_NETWORK);
         contractCache.set(
             key,
-            (getContract(address, CASE_ENGINE_ABI, provider, networks.opnetTestnet) as unknown) as ContractInstance,
+            (getContract(address, CASE_ENGINE_ABI, provider, ACTIVE_NETWORK) as unknown) as ContractInstance,
         );
     }
     return contractCache.get(key) as ContractInstance;
@@ -175,10 +180,10 @@ export function getLpPoolContract(): ContractInstance {
     const address = getLpPoolAddress();
     const key = `lp-pool-${address}`;
     if (!contractCache.has(key)) {
-        const provider = getProvider(networks.opnetTestnet);
+        const provider = getProvider(ACTIVE_NETWORK);
         contractCache.set(
             key,
-            (getContract(address, LP_POOL_ABI, provider, networks.opnetTestnet) as unknown) as ContractInstance,
+            (getContract(address, LP_POOL_ABI, provider, ACTIVE_NETWORK) as unknown) as ContractInstance,
         );
     }
     return contractCache.get(key) as ContractInstance;
@@ -188,10 +193,10 @@ export function getCasaStakingContract(): ContractInstance {
     const address = getCasaStakingAddress();
     const key = `casa-staking-${address}`;
     if (!contractCache.has(key)) {
-        const provider = getProvider(networks.opnetTestnet);
+        const provider = getProvider(ACTIVE_NETWORK);
         contractCache.set(
             key,
-            (getContract(address, CASA_STAKING_ABI, provider, networks.opnetTestnet) as unknown) as ContractInstance,
+            (getContract(address, CASA_STAKING_ABI, provider, ACTIVE_NETWORK) as unknown) as ContractInstance,
         );
     }
     return contractCache.get(key) as ContractInstance;
@@ -201,10 +206,10 @@ export function getPointsContract(): ContractInstance {
     const address = getPointsAddress();
     const key = `points-${address}`;
     if (!contractCache.has(key)) {
-        const provider = getProvider(networks.opnetTestnet);
+        const provider = getProvider(ACTIVE_NETWORK);
         contractCache.set(
             key,
-            (getContract(address, POINTS_ABI, provider, networks.opnetTestnet) as unknown) as ContractInstance,
+            (getContract(address, POINTS_ABI, provider, ACTIVE_NETWORK) as unknown) as ContractInstance,
         );
     }
     return contractCache.get(key) as ContractInstance;

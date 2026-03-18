@@ -23,12 +23,29 @@ export function PointsPage(): React.ReactElement {
     const [referralLink, setReferralLink] = useState('');
     const [copied, setCopied] = useState(false);
 
+    const [referrerRegistered, setReferrerRegistered] = useState(false);
+
     useEffect((): void => {
         if (walletAddress) {
             const base = window.location.origin + window.location.pathname;
             setReferralLink(`${base}?ref=${walletAddress}`);
         }
     }, [walletAddress]);
+
+    // Register referrer from URL param (?ref=ADDRESS) on first connect
+    useEffect((): void => {
+        if (!isConnected || !senderAddress || referrerRegistered) return;
+        const params = new URLSearchParams(window.location.search);
+        const refAddress = params.get('ref');
+        if (!refAddress || refAddress === walletAddress) return;
+
+        setReferrerRegistered(true);
+        const contract = getPointsContract(senderAddress);
+        void contract.setReferrer(refAddress).then((callResult) => {
+            if (callResult.revert) return; // already set or invalid — silently skip
+            void send(callResult).catch(() => { /* user rejected or tx failed */ });
+        }).catch(() => { /* contract call failed */ });
+    }, [isConnected, senderAddress, walletAddress, referrerRegistered, send]);
 
     const loadInfo = useCallback(async (): Promise<void> => {
         setInfoLoading(true);
