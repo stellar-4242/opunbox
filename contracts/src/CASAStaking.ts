@@ -99,7 +99,15 @@ export class CASAStaking extends OP_NET {
         const existing: u256 = this.stakeAmount.get(caller);
         if (!existing.isZero()) {
             this._checkpointWeightedStake(caller);
-            // Update snapshot to capture pending before adding
+
+            // Pay out pending rewards BEFORE resetting the snapshot so they are not forfeited
+            const pending: u256 = this._computePending(caller);
+            if (!pending.isZero()) {
+                const motoAddr: Address = this.motoToken.value;
+                this._transfer(motoAddr, caller, pending);
+            }
+
+            // NOW safe to advance snapshot — pending has been paid
             this.stakeRevenueSnapshot.set(caller, this.revenuePerWeightedStake.value);
         }
 
@@ -154,14 +162,10 @@ export class CASAStaking extends OP_NET {
 
         const pending: u256 = this._computePending(caller);
 
-        // CEI: remove from totalWeightedStake
+        // CEI: remove from totalWeightedStake — strict sub reverts on underflow to surface bugs
         const userWeighted: u256 = this.stakeWeightedSnapshot.get(caller);
         const currentTotal: u256 = this.totalWeightedStake.value;
-        if (u256.gt(currentTotal, userWeighted)) {
-            this.totalWeightedStake.value = SafeMath.sub(currentTotal, userWeighted);
-        } else {
-            this.totalWeightedStake.value = u256.Zero;
-        }
+        this.totalWeightedStake.value = SafeMath.sub(currentTotal, userWeighted);
 
         // Clear user state (multiplier resets to 1.0x)
         this.stakeAmount.set(caller, u256.Zero);

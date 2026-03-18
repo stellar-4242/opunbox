@@ -213,11 +213,8 @@ export class LPPool extends OP_NET {
         this.depositTier.set(caller, u256.Zero);
         this.depositRevenueSnapshot.set(caller, u256.Zero);
 
-        if (u256.gt(this.totalDeposited.value, totalPayout)) {
-            this.totalDeposited.value = SafeMath.sub(this.totalDeposited.value, totalPayout);
-        } else {
-            this.totalDeposited.value = u256.Zero;
-        }
+        // Strict sub — reverts on underflow to surface accounting bugs
+        this.totalDeposited.value = SafeMath.sub(this.totalDeposited.value, totalPayout);
 
         // Interaction last
         const motoAddr: Address = this.motoToken.value;
@@ -251,12 +248,8 @@ export class LPPool extends OP_NET {
             throw new Revert('LPPool: payout exceeds available balance');
         }
 
-        // AUDIT FIX: CEI — decrement totalDeposited BEFORE token transfer
-        if (u256.gt(this.totalDeposited.value, amount)) {
-            this.totalDeposited.value = SafeMath.sub(this.totalDeposited.value, amount);
-        } else {
-            this.totalDeposited.value = u256.Zero;
-        }
+        // CEI — decrement totalDeposited BEFORE token transfer; strict sub reverts on underflow
+        this.totalDeposited.value = SafeMath.sub(this.totalDeposited.value, amount);
 
         const motoAddr: Address = this.motoToken.value;
         this._transfer(motoAddr, recipient, amount);

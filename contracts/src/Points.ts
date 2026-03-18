@@ -119,6 +119,22 @@ export class Points extends OP_NET {
         const existing: u256 = this.referrers.get(caller);
         if (!existing.isZero()) throw new Revert('Points: referrer already set');
 
+        // Reject circular referrals: check whether the proposed referrer has already set
+        // the caller as THEIR referrer. A -> B then B -> A would inflate both shares.
+        const reverseRef: u256 = this.referrers.get(referrer);
+        if (!reverseRef.isZero()) {
+            const rawBytes: Uint8Array = reverseRef.toUint8Array(true);
+            const refBytes: Uint8Array = new Uint8Array(32);
+            const offset: i32 = 32 - rawBytes.length;
+            for (let i: i32 = 0; i < rawBytes.length; i++) {
+                refBytes[offset + i] = rawBytes[i];
+            }
+            const reverseAddr: Address = Address.fromUint8Array(refBytes);
+            if (reverseAddr.equals(caller)) {
+                throw new Revert('Points: circular referral not allowed');
+            }
+        }
+
         // Store referrer address as u256 (use fromUint8ArrayBE for Address bytes)
         this.referrers.set(caller, u256.fromUint8ArrayBE(referrer));
 
