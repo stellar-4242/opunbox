@@ -17,6 +17,51 @@ import type { CaseResult } from '../types/contracts';
 const MAX_HISTORY = 10;
 const CASE_ENGINE_ADDRESS = import.meta.env.VITE_CASE_ENGINE_ADDRESS as string | undefined;
 
+interface RarityTier {
+    key: string;
+    name: string;
+    colorClass: string;
+    multiplier: string;
+    probability: string;
+    threshold: number;
+}
+
+const RARITY_TIERS: RarityTier[] = [
+    { key: 'gold',   name: 'Knife',      colorClass: 'rarity-card--gold',   multiplier: '30x',    probability: '0.26%',  threshold: 0.0026  },
+    { key: 'red',    name: 'Covert',     colorClass: 'rarity-card--red',    multiplier: '25x',    probability: '0.64%',  threshold: 0.009   },
+    { key: 'pink',   name: 'Classified', colorClass: 'rarity-card--pink',   multiplier: '6x',     probability: '3.20%',  threshold: 0.041   },
+    { key: 'purple', name: 'Restricted', colorClass: 'rarity-card--purple', multiplier: '2x',     probability: '15.98%', threshold: 0.2008  },
+    { key: 'blue',   name: 'Mil-Spec',   colorClass: 'rarity-card--blue',   multiplier: '0.25x',  probability: '79.92%', threshold: 1       },
+];
+
+function getTierFromPayout(payout: bigint, betAmount: bigint): RarityTier {
+    if (betAmount === 0n) return RARITY_TIERS[4];
+    const ratio = Number(payout) / Number(betAmount);
+    if (ratio >= 25)  return RARITY_TIERS[0]; // gold
+    if (ratio >= 20)  return RARITY_TIERS[1]; // red
+    if (ratio >= 5)   return RARITY_TIERS[2]; // pink
+    if (ratio >= 1.5) return RARITY_TIERS[3]; // purple
+    return RARITY_TIERS[4];                   // blue (loss / sub-1x)
+}
+
+function getResultClass(won: boolean, payout: bigint, betAmount: bigint): string {
+    if (!won) return 'result-reveal--loss';
+    const tier = getTierFromPayout(payout, betAmount);
+    return `result-reveal--${tier.key}`;
+}
+
+function getResultLabel(won: boolean, payout: bigint, betAmount: bigint): string {
+    if (!won) return 'MISS';
+    const tier = getTierFromPayout(payout, betAmount);
+    return tier.name.toUpperCase();
+}
+
+function getTierLabel(won: boolean, payout: bigint, betAmount: bigint): string {
+    if (!won) return 'Mil-Spec';
+    const tier = getTierFromPayout(payout, betAmount);
+    return tier.name;
+}
+
 export function CasePage(): React.ReactElement {
     const { isConnected, walletAddress, senderAddress } = useWallet();
     const { state: txState, send, reset } = useTransaction(walletAddress);
@@ -28,7 +73,7 @@ export function CasePage(): React.ReactElement {
     const [seedError, setSeedError] = useState('');
     const [simulating, setSimulating] = useState(false);
     const [txStep, setTxStep] = useState<'idle' | 'approving' | 'opening'>('idle');
-    const [lastResult, setLastResult] = useState<{ won: boolean; payout: bigint } | null>(null);
+    const [lastResult, setLastResult] = useState<{ won: boolean; payout: bigint; betAmount: bigint } | null>(null);
     const [history, setHistory] = useState<CaseResult[]>([]);
     const [poolTotal, setPoolTotal] = useState<bigint | null>(null);
     const [poolLoading, setPoolLoading] = useState(false);
@@ -126,7 +171,7 @@ export function CasePage(): React.ReactElement {
             const txHash = await send(callResult);
 
             if (txHash) {
-                setLastResult({ won, payout });
+                setLastResult({ won, payout, betAmount: amount });
                 const entry: CaseResult = {
                     won,
                     payout,
@@ -164,16 +209,31 @@ export function CasePage(): React.ReactElement {
                 <p className="page__subtitle">Wager $MOTO for a chance to win from the community LP pool</p>
             </div>
 
-            {poolLoading ? (
-                <div className="stat-card">
-                    <SkeletonBlock lines={2} />
-                </div>
-            ) : poolTotal !== null && (
-                <div className="stat-card">
-                    <span className="stat-card__label">Pool Total</span>
-                    <span className="stat-card__value tabular">{formatTokenAmount(poolTotal)} $MOTO</span>
-                </div>
-            )}
+            {/* Rarity Tier Grid */}
+            <div className="rarity-grid">
+                {RARITY_TIERS.map(tier => (
+                    <div key={tier.key} className={`rarity-card ${tier.colorClass}`}>
+                        <span className={`rarity-card__multiplier`}>{tier.multiplier}</span>
+                        <span className={`rarity-card__name`}>{tier.name}</span>
+                        <span className="rarity-card__prob">{tier.probability}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Pool stat + fairness badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                {poolLoading ? (
+                    <div className="stat-card" style={{ flex: 1 }}>
+                        <SkeletonBlock lines={2} />
+                    </div>
+                ) : poolTotal !== null ? (
+                    <div className="stat-card" style={{ flex: 1 }}>
+                        <span className="stat-card__label">Pool Total</span>
+                        <span className="stat-card__value tabular">{formatTokenAmount(poolTotal)} $MOTO</span>
+                    </div>
+                ) : null}
+                <span className="fairness-badge">95% RTP — Provably Fair</span>
+            </div>
 
             <div className="card">
                 <h2 className="card__title">Bet Configuration</h2>
@@ -247,7 +307,7 @@ export function CasePage(): React.ReactElement {
                             <span className="step-indicator__number">1</span>
                             <span className="step-indicator__label">Approve tokens</span>
                         </div>
-                        <div className={`step-indicator__divider`} />
+                        <div className="step-indicator__divider" />
                         <div className={`step-indicator__step ${txStep === 'opening' ? 'step-indicator__step--active' : ''}`}>
                             <span className="step-indicator__number">2</span>
                             <span className="step-indicator__label">Open case</span>
@@ -260,7 +320,7 @@ export function CasePage(): React.ReactElement {
                 )}
 
                 <button
-                    className="btn btn--primary btn--full"
+                    className={`btn btn--open-case${isLoading ? ' btn--open-case--loading' : ''}`}
                     onClick={(): void => { void handleOpenCase(); }}
                     disabled={isLoading || !isConnected || !betAmount}
                     type="button"
@@ -274,12 +334,15 @@ export function CasePage(): React.ReactElement {
             </div>
 
             {lastResult !== null && (
-                <div className={`result-reveal ${lastResult.won ? 'result-reveal--win' : 'result-reveal--loss'}`}>
+                <div className={`result-reveal ${getResultClass(lastResult.won, lastResult.payout, lastResult.betAmount)}`}>
+                    <span className="result-reveal__tier-label">
+                        {getTierLabel(lastResult.won, lastResult.payout, lastResult.betAmount)}
+                    </span>
                     <div className="result-reveal__label">
-                        {lastResult.won ? 'WIN' : 'LOSS'}
+                        {getResultLabel(lastResult.won, lastResult.payout, lastResult.betAmount)}
                     </div>
                     <div className="result-reveal__payout">
-                        Payout: {formatTokenAmount(lastResult.payout)} MOTO
+                        Payout: {formatTokenAmount(lastResult.payout)} $MOTO
                     </div>
                     {txState.txHash && (
                         <ExplorerLinks txHash={txState.txHash} label="Case Transaction" />
@@ -294,10 +357,10 @@ export function CasePage(): React.ReactElement {
                         {history.map((entry, i) => (
                             <div key={i} className={`history-item ${entry.won ? 'history-item--win' : 'history-item--loss'}`}>
                                 <span className="history-item__result">
-                                    {entry.won ? 'WIN' : 'LOSS'}
+                                    {entry.won ? 'WIN' : 'MISS'}
                                 </span>
                                 <span className="history-item__amount tabular">
-                                    Bet: {formatTokenAmount(entry.amount)} → Payout: {formatTokenAmount(entry.payout)} $MOTO
+                                    Bet: {formatTokenAmount(entry.amount)} | Payout: {formatTokenAmount(entry.payout)} $MOTO
                                 </span>
                                 <div className="history-item__links">
                                     <ExplorerLinks txHash={entry.txHash} label="" />

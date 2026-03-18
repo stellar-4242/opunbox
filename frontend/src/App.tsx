@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { WalletProvider } from './hooks/WalletContext';
 import { Nav } from './components/Nav';
 import { CasePage } from './pages/CasePage';
 import { LPPage } from './pages/LPPage';
@@ -49,20 +50,22 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryS
 export function App(): React.ReactElement {
     return (
         <AppErrorBoundary>
-            <BrowserRouter>
-                <div className="app">
-                    <Nav />
-                    <main className="app__main">
-                        <Routes>
-                            <Route path="/" element={<CasePage />} />
-                            <Route path="/lp" element={<LPPage />} />
-                            <Route path="/staking" element={<StakingPage />} />
-                            <Route path="/points" element={<PointsPage />} />
-                            <Route path="/stats" element={<StatsPage />} />
-                        </Routes>
-                    </main>
-                </div>
-            </BrowserRouter>
+            <WalletProvider>
+                <BrowserRouter>
+                    <div className="app">
+                        <Nav />
+                        <main className="app__main">
+                            <Routes>
+                                <Route path="/" element={<CasePage />} />
+                                <Route path="/lp" element={<LPPage />} />
+                                <Route path="/staking" element={<StakingPage />} />
+                                <Route path="/points" element={<PointsPage />} />
+                                <Route path="/stats" element={<StatsPage />} />
+                            </Routes>
+                        </main>
+                    </div>
+                </BrowserRouter>
+            </WalletProvider>
         </AppErrorBoundary>
     );
 }

@@ -10,6 +10,19 @@ interface DashboardStats {
     isAboveMinimum: boolean;
 }
 
+function getHealthClass(ratio: number | null): { dotClass: string; label: string } {
+    if (ratio === null) return { dotClass: '', label: '--' };
+    if (ratio >= 40) return { dotClass: 'stat-card__health-dot--green', label: 'Healthy' };
+    if (ratio >= 20) return { dotClass: 'stat-card__health-dot--yellow', label: 'Moderate' };
+    return { dotClass: 'stat-card__health-dot--red', label: 'Low Reserve' };
+}
+
+function getReserveBarClass(ratio: number): string {
+    if (ratio >= 40) return 'reserve-bar__fill--green';
+    if (ratio >= 20) return 'reserve-bar__fill--yellow';
+    return 'reserve-bar__fill--red';
+}
+
 export function StatsPage(): React.ReactElement {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(false);
@@ -48,6 +61,8 @@ export function StatsPage(): React.ReactElement {
         ? Number((stats.poolAvailable * 100n) / stats.poolTotal)
         : null;
 
+    const health = getHealthClass(reserveRatio);
+
     return (
         <main className="page">
             <div className="page__header">
@@ -79,14 +94,39 @@ export function StatsPage(): React.ReactElement {
                         </span>
                     </div>
                     <div className="stat-card">
-                        <span className="stat-card__label">Pool Status</span>
-                        <span className={`stat-card__value ${stats.isAboveMinimum ? 'stat-card__value--ok' : 'stat-card__value--warn'}`}>
-                            {stats.isAboveMinimum ? 'Active' : 'Below Minimum'}
+                        <span className="stat-card__label">Pool Health</span>
+                        <span className={`stat-card__value stat-card__health ${stats.isAboveMinimum ? 'stat-card__value--ok' : 'stat-card__value--warn'}`}>
+                            {health.dotClass && (
+                                <span className={`stat-card__health-dot ${health.dotClass}`} />
+                            )}
+                            {health.label}
                         </span>
                     </div>
                 </div>
             ) : (
                 <p className="form-hint form-hint--center">Unable to load stats</p>
+            )}
+
+            {/* Reserve Ratio Bar */}
+            {stats && reserveRatio !== null && (
+                <div className="card">
+                    <h2 className="card__title">Reserve Ratio</h2>
+                    <div className="reserve-bar-wrap">
+                        <div className="reserve-bar-labels">
+                            <span>Available: {reserveRatio.toFixed(1)}%</span>
+                            <span>Reserved / Locked: {(100 - reserveRatio).toFixed(1)}%</span>
+                        </div>
+                        <div className="reserve-bar">
+                            <div
+                                className={`reserve-bar__fill ${getReserveBarClass(reserveRatio)}`}
+                                style={{ width: `${Math.min(reserveRatio, 100)}%` }}
+                            />
+                        </div>
+                        <span className="form-hint">
+                            Green: healthy (&gt;40%) — Yellow: moderate (20–40%) — Red: critical (&lt;20%)
+                        </span>
+                    </div>
+                </div>
             )}
 
             <div className="card">
@@ -106,11 +146,11 @@ export function StatsPage(): React.ReactElement {
                     <div className="split-legend">
                         <div className="split-legend__item">
                             <span className="split-legend__dot split-legend__dot--lp" />
-                            <span>60% LP Providers (pro-rata by deposit and lock tier)</span>
+                            <span>60% LP Providers — pro-rata by deposit and lock tier</span>
                         </div>
                         <div className="split-legend__item">
                             <span className="split-legend__dot split-legend__dot--staking" />
-                            <span>30% $CASA Stakers (weighted by stake and multiplier)</span>
+                            <span>30% $CASA Stakers — weighted by stake and multiplier</span>
                         </div>
                         <div className="split-legend__item">
                             <span className="split-legend__dot split-legend__dot--treasury" />

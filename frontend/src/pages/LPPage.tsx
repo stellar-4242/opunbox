@@ -18,6 +18,15 @@ interface PoolStats {
     isAboveMinimum: boolean;
 }
 
+// Color accents for LP lock tiers
+const TIER_ACCENT_CLASSES = ['tier-card--blue-accent', 'tier-card--purple-accent', 'tier-card--gold-accent'];
+
+function getReserveBarClass(ratio: number): string {
+    if (ratio >= 40) return 'reserve-bar__fill--green';
+    if (ratio >= 20) return 'reserve-bar__fill--yellow';
+    return 'reserve-bar__fill--red';
+}
+
 export function LPPage(): React.ReactElement {
     const { isConnected, walletAddress, senderAddress } = useWallet();
     const { state: txState, send, reset } = useTransaction(walletAddress);
@@ -170,7 +179,7 @@ export function LPPage(): React.ReactElement {
                         <div className="stat-card"><SkeletonBlock lines={2} /></div>
                         <div className="stat-card"><SkeletonBlock lines={2} /></div>
                     </>
-                ) : poolStats && (
+                ) : poolStats ? (
                     <>
                         <div className="stat-card">
                             <span className="stat-card__label">Total Pool Size</span>
@@ -181,14 +190,37 @@ export function LPPage(): React.ReactElement {
                             <span className="stat-card__value tabular">{formatTokenAmount(poolStats.availableBalance)} $MOTO</span>
                         </div>
                         <div className="stat-card">
-                            <span className="stat-card__label">Reserve Ratio</span>
-                            <span className={`stat-card__value tabular ${reserveRatio !== null && reserveRatio < 20 ? 'stat-card__value--warn' : ''}`}>
-                                {reserveRatio !== null ? `${reserveRatio.toFixed(1)}%` : '--'}
+                            <span className="stat-card__label">Pool Status</span>
+                            <span className={`stat-card__value stat-card__health ${poolStats.isAboveMinimum ? 'stat-card__value--ok' : 'stat-card__value--warn'}`}>
+                                <span className={`stat-card__health-dot ${poolStats.isAboveMinimum ? 'stat-card__health-dot--green' : 'stat-card__health-dot--red'}`} />
+                                {poolStats.isAboveMinimum ? 'Active' : 'Below Minimum'}
                             </span>
                         </div>
                     </>
-                )}
+                ) : null}
             </div>
+
+            {/* Reserve Ratio Progress Bar */}
+            {poolStats && reserveRatio !== null && (
+                <div className="card">
+                    <h2 className="card__title">Reserve Ratio</h2>
+                    <div className="reserve-bar-wrap">
+                        <div className="reserve-bar-labels">
+                            <span>Available: {reserveRatio.toFixed(1)}%</span>
+                            <span>Reserved: {(100 - reserveRatio).toFixed(1)}%</span>
+                        </div>
+                        <div className="reserve-bar">
+                            <div
+                                className={`reserve-bar__fill ${getReserveBarClass(reserveRatio)}`}
+                                style={{ width: `${Math.min(reserveRatio, 100)}%` }}
+                            />
+                        </div>
+                        <span className="form-hint">
+                            20% reserve is always maintained. Withdrawals are paused when the pool falls below the minimum threshold.
+                        </span>
+                    </div>
+                </div>
+            )}
 
             {senderAddress && poolStats && poolStats.myDeposit > 0n && (
                 <div className="card card--position">
@@ -232,11 +264,11 @@ export function LPPage(): React.ReactElement {
                 <div className="form-group">
                     <label className="form-label">Lock Tier</label>
                     <div className="tier-grid">
-                        {LOCK_TIERS.map(tier => (
+                        {LOCK_TIERS.map((tier, idx) => (
                             <button
                                 key={tier.tier}
                                 type="button"
-                                className={`tier-card ${selectedTier === tier.tier ? 'tier-card--selected' : ''}`}
+                                className={`tier-card ${TIER_ACCENT_CLASSES[idx] ?? ''} ${selectedTier === tier.tier ? 'tier-card--selected' : ''}`}
                                 onClick={(): void => setSelectedTier(tier.tier)}
                                 disabled={isLoading}
                             >

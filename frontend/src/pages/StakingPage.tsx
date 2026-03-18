@@ -14,10 +14,10 @@ interface StakeInfo {
     pendingRewards: bigint;
 }
 
-const STAKING_TIERS = [
-    { label: '7 days continuous', multiplier: '1.0x' },
-    { label: '30 days continuous', multiplier: '1.3x' },
-    { label: '90 days continuous', multiplier: '1.8x' },
+const STAKING_MILESTONES = [
+    { label: '7 days',  value: '1.0x', colorClass: 'blue',   dotClass: 'staking-milestone__dot--blue',   valueClass: 'staking-milestone__value--blue'   },
+    { label: '30 days', value: '1.3x', colorClass: 'purple', dotClass: 'staking-milestone__dot--purple', valueClass: 'staking-milestone__value--purple' },
+    { label: '90 days', value: '1.8x', colorClass: 'gold',   dotClass: 'staking-milestone__dot--gold',   valueClass: 'staking-milestone__value--gold'   },
 ];
 
 export function StakingPage(): React.ReactElement {
@@ -174,18 +174,24 @@ export function StakingPage(): React.ReactElement {
                 <p className="page__subtitle">Stake $CASA to earn 30% of all house profits in $MOTO</p>
             </div>
 
+            {/* Multiplier progression timeline */}
             <div className="card">
-                <h2 className="card__title">Staking Multipliers</h2>
-                <div className="tier-grid">
-                    {STAKING_TIERS.map(tier => (
-                        <div key={tier.label} className="tier-card tier-card--info">
-                            <span className="tier-card__duration">{tier.label}</span>
-                            <span className="tier-card__multiplier">{tier.multiplier}</span>
-                            <span className="tier-card__hint">$MOTO rewards weight</span>
+                <h2 className="card__title">Multiplier Progression</h2>
+                <div className="staking-timeline">
+                    {STAKING_MILESTONES.map((m, idx) => (
+                        <div key={m.label} className="staking-milestone">
+                            <div className={`staking-milestone__dot ${m.dotClass}`}>
+                                {idx + 1}
+                            </div>
+                            <span className={`staking-milestone__value ${m.valueClass}`}>{m.value}</span>
+                            <span className="staking-milestone__label">{m.label}<br />continuous</span>
                         </div>
                     ))}
                 </div>
-                <p className="form-hint">Unstaking resets your multiplier. You will have a 7-day warmup before earning rewards again.</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <span className="warmup-badge">7-day warmup before rewards start</span>
+                    <span className="form-hint">Unstaking resets your multiplier to 1.0x.</span>
+                </div>
             </div>
 
             {senderAddress && (
@@ -194,36 +200,40 @@ export function StakingPage(): React.ReactElement {
                     {infoLoading ? (
                         <SkeletonBlock lines={3} />
                     ) : stakeInfo ? (
-                        <div className="position-info">
-                            <div className="position-row">
-                                <span className="position-row__label">Staked $CASA</span>
-                                <span className="position-row__value tabular">{formatTokenAmount(stakeInfo.staked)}</span>
+                        <>
+                            <div className="position-info">
+                                <div className="position-row">
+                                    <span className="position-row__label">Staked $CASA</span>
+                                    <span className="position-row__value tabular">{formatTokenAmount(stakeInfo.staked)}</span>
+                                </div>
+                                <div className="position-row">
+                                    <span className="position-row__label">Pending $MOTO Rewards</span>
+                                    <span className="position-row__value tabular" style={{ color: stakeInfo.pendingRewards > 0n ? 'var(--color-win)' : undefined }}>
+                                        {formatTokenAmount(stakeInfo.pendingRewards)}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="position-row">
-                                <span className="position-row__label">Pending $MOTO Rewards</span>
-                                <span className="position-row__value tabular">{formatTokenAmount(stakeInfo.pendingRewards)}</span>
-                            </div>
-                        </div>
-                    ) : null}
 
-                    <div className="button-row">
-                        <button
-                            className="btn btn--secondary"
-                            onClick={(): void => { void handleClaimRewards(); }}
-                            disabled={isLoading || !stakeInfo || stakeInfo.pendingRewards === 0n}
-                            type="button"
-                        >
-                            {isLoading && actionType === 'claim' ? 'Claiming...' : 'Claim Rewards'}
-                        </button>
-                        <button
-                            className="btn btn--ghost btn--warn"
-                            onClick={(): void => setShowUnstakeWarning(true)}
-                            disabled={isLoading || !stakeInfo || stakeInfo.staked === 0n}
-                            type="button"
-                        >
-                            Unstake
-                        </button>
-                    </div>
+                            <div className="button-row">
+                                <button
+                                    className="btn btn--secondary"
+                                    onClick={(): void => { void handleClaimRewards(); }}
+                                    disabled={isLoading || !stakeInfo || stakeInfo.pendingRewards === 0n}
+                                    type="button"
+                                >
+                                    {isLoading && actionType === 'claim' ? 'Claiming...' : 'Claim Rewards'}
+                                </button>
+                                <button
+                                    className="btn btn--ghost btn--warn"
+                                    onClick={(): void => setShowUnstakeWarning(true)}
+                                    disabled={isLoading || !stakeInfo || stakeInfo.staked === 0n}
+                                    type="button"
+                                >
+                                    Unstake
+                                </button>
+                            </div>
+                        </>
+                    ) : null}
 
                     {txState.txHash && actionType === null && (
                         <ExplorerLinks txHash={txState.txHash} label="Transaction" />
