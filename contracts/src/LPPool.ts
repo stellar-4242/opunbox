@@ -122,10 +122,10 @@ export class LPPool extends OP_NET {
         if (!existingShares.isZero()) {
             const pending: u256 = this._computePendingRevenue(caller);
             if (!pending.isZero()) {
-                // Auto-compound pending into deposit amount
+                // Auto-compound pending into deposit amount (user's record only).
+                // DO NOT increment totalDeposited — the pending MOTO was already counted
+                // when addRevenue() was called. Only the user's principal record needs updating.
                 this.depositAmount.set(caller, SafeMath.add(existingAmount, pending));
-                // MAJOR-2 FIX: also increment totalDeposited by the compounded amount
-                this.totalDeposited.value = SafeMath.add(this.totalDeposited.value, pending);
             }
         }
 
