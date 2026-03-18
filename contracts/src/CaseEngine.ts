@@ -39,7 +39,7 @@ const MIN_BET: u256 = u256.fromString('1000000000000000000'); // 1 MOTO (10^18)
 // Pink (Classified)      | [90,  409]    |  3.20%      |  6x        | 0.192
 // Purple (Restricted)    | [410, 2007]   | 15.98%      |  2x        | 0.320
 // Blue (Mil-Spec)        | [2008, 9999]  | 79.92%      |  0.25x     | 0.200
-// Total EV = 0.9494 ≈ 95% RTP (house edge ~5.06%)
+// Total EV = 9494/10000 = 94.94% RTP (house edge ~5.06% including the 5% flat fee)
 const GOLD_THRESHOLD: u64 = 26;      // 0-25 = gold (0.26%)
 const RED_THRESHOLD: u64 = 90;       // 26-89 = red (0.64%)
 const PINK_THRESHOLD: u64 = 410;     // 90-409 = pink (3.2%)

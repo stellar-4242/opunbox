@@ -273,17 +273,12 @@ export class CASAStaking extends OP_NET {
         return w;
     }
 
-    // AUDIT FIX: Multiplier applied in reward computation
+    // Compute pending rewards using the CHECKPOINTED weighted stake (not current multiplier).
+    // This prevents over-payment when a user's multiplier tier has increased since the last
+    // checkpoint — the delta was accumulated under the old multiplier, so we use the old weight.
     private _computePending(user: Address): u256 {
-        const amount: u256 = this.stakeAmount.get(user);
-        if (amount.isZero()) return u256.Zero;
-
-        // effectiveStake = stakeAmount * currentMultiplier / MULTI_DENOM
-        const multiplier: u64 = this._getCurrentMultiplier(user);
-        const effectiveStake: u256 = SafeMath.div(
-            SafeMath.mul(amount, u256.fromU64(multiplier)),
-            u256.fromU64(MULTI_DENOM),
-        );
+        const weightedStake: u256 = this.stakeWeightedSnapshot.get(user);
+        if (weightedStake.isZero()) return u256.Zero;
 
         const currentRPWS: u256 = this.revenuePerWeightedStake.value;
         const snapshot: u256 = this.stakeRevenueSnapshot.get(user);
@@ -291,7 +286,7 @@ export class CASAStaking extends OP_NET {
         if (u256.le(currentRPWS, snapshot)) return u256.Zero;
 
         const delta: u256 = SafeMath.sub(currentRPWS, snapshot);
-        return SafeMath.div(SafeMath.mul(effectiveStake, delta), DECIMAL_BASE);
+        return SafeMath.div(SafeMath.mul(weightedStake, delta), DECIMAL_BASE);
     }
 
     // AUDIT FIX: Checkpoint pattern — update totalWeightedStake when multiplier changes
