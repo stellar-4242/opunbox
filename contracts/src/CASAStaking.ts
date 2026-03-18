@@ -303,6 +303,12 @@ export class CASAStaking extends OP_NET {
 
         const oldWeighted: u256 = this.stakeWeightedSnapshot.get(user);
 
+        // If transitioning out of warmup (0 -> non-zero weight),
+        // reset revenue snapshot so user only earns from NOW
+        if (oldWeighted.isZero() && !newWeighted.isZero()) {
+            this.stakeRevenueSnapshot.set(user, this.revenuePerWeightedStake.value);
+        }
+
         const currentTotal: u256 = this.totalWeightedStake.value;
         if (u256.gt(currentTotal, oldWeighted)) {
             this.totalWeightedStake.value = SafeMath.add(

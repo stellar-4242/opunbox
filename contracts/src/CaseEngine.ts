@@ -28,6 +28,9 @@ const STAKING_SHARE_BPS: u64 = 3000; // 30%
 // Treasury = 10% (remainder)
 const MAX_BET_BPS: u64 = 100;       // 1% of total pool
 const MAX_PAYOUT_BPS: u64 = 500;    // 5% of available balance
+// Minimum bet: must ensure betAmount * MULTI_BLUE / MULTI_DENOM >= 1
+// MULTI_BLUE=25, MULTI_DENOM=100 => min = 100/25 = 4; use 1 MOTO (10^18) as practical floor
+const MIN_BET: u256 = u256.fromString('1000000000000000000'); // 1 MOTO (10^18)
 
 // CS2-style payout tiers (roll = RNG % 10000, range [0, 9999])
 // Tier                   | Range         | Probability | Multiplier | EV contribution
@@ -115,6 +118,7 @@ export class CaseEngine extends OP_NET {
         const userSeed: Uint8Array = calldata.readBytes(32);
 
         if (betAmount.isZero()) throw new Revert('CaseEngine: bet amount is zero');
+        if (u256.lt(betAmount, MIN_BET)) throw new Revert('CaseEngine: bet below minimum');
 
         const lpPoolAddr: Address = this.lpPool.value;
 
