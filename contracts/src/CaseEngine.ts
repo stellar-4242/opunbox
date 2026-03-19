@@ -82,7 +82,6 @@ export class CaseEngine extends OP_NET {
     }
 
     public override onDeployment(_calldata: Calldata): void {
-        // No cross-contract calls here (FORBIDDEN in onDeployment)
         const motoAddr: Address = _calldata.readAddress();
         const casaAddr: Address = _calldata.readAddress();
         const lpPoolAddr: Address = _calldata.readAddress();
