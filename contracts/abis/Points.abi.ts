@@ -4,6 +4,12 @@ export const PointsEvents = [];
 
 export const PointsAbi = [
     {
+        name: 'initialize',
+        inputs: [],
+        outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'addPoints',
         inputs: [
             { name: 'recipient', type: ABIDataTypes.ADDRESS },

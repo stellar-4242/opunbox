@@ -1,6 +1,19 @@
 {
     "functions": [
         {
+            "name": "initialize",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
             "name": "openCase",
             "type": "Function",
             "payable": false,
@@ -19,6 +32,10 @@
                 {
                     "name": "won",
                     "type": "BOOL"
+                },
+                {
+                    "name": "payout",
+                    "type": "UINT256"
                 }
             ]
         },

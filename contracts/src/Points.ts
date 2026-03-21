@@ -35,11 +35,13 @@ export class Points extends OP_NET {
     private readonly referrersPtr: u16 = Blockchain.nextPointer;
     private readonly airdropClaimedPtr: u16 = Blockchain.nextPointer;
     private readonly casaTokenPtr: u16 = Blockchain.nextPointer;
+    private readonly initializedPtr: u16 = Blockchain.nextPointer;
 
     private readonly deploymentBlock: StoredU256 = new StoredU256(this.deploymentBlockPtr, EMPTY_POINTER);
     private readonly totalPointsStored: StoredU256 = new StoredU256(this.totalPointsPtr, EMPTY_POINTER);
     private readonly airdropTriggered: StoredBoolean = new StoredBoolean(this.airdropTriggeredPtr, false);
     private readonly casaTokenAddress: StoredAddress = new StoredAddress(this.casaTokenPtr);
+    private readonly initialized: StoredBoolean = new StoredBoolean(this.initializedPtr, false);
 
     // authorized contracts: address => 1/0
     private readonly authorized: AddressMemoryMap = new AddressMemoryMap(this.authorizedPtr);
@@ -57,20 +59,34 @@ export class Points extends OP_NET {
     public override onDeployment(_calldata: Calldata): void {
         // AUDIT FIX: Store deployment block for airdrop delay enforcement
         this.deploymentBlock.value = u256.fromU64(Blockchain.block.number);
+    }
+
+    // initialize([uint8 count, address auth1, ..., authN, address casaToken])
+    // One-time call by deployer to set authorized contracts and CASA token address.
+    @method()
+    @returns({ name: 'success', type: ABIDataTypes.BOOL })
+    public initialize(calldata: Calldata): BytesWriter {
+        this.onlyDeployer(Blockchain.tx.sender);
+        if (this.initialized.value) throw new Revert('Points: already initialized');
+        this.initialized.value = true;
 
         // Parse: [uint8 count, address1, ..., casaTokenAddress]
-        const count: u8 = _calldata.readU8();
+        const count: u8 = calldata.readU8();
         for (let i: u8 = 0; i < count; i++) {
-            const addr: Address = _calldata.readAddress();
+            const addr: Address = calldata.readAddress();
             if (!addr.isZero()) {
                 this.authorized.set(addr, u256.One);
             }
         }
 
-        const casaAddr: Address = _calldata.readAddress();
+        const casaAddr: Address = calldata.readAddress();
         if (!casaAddr.isZero()) {
             this.casaTokenAddress.value = casaAddr;
         }
+
+        const w = new BytesWriter(1);
+        w.writeBoolean(true);
+        return w;
     }
 
     // addPoints(address,uint256) — authorized only

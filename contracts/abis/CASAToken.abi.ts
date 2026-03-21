@@ -4,6 +4,12 @@ export const CASATokenEvents = [];
 
 export const CASATokenAbi = [
     {
+        name: 'initialize',
+        inputs: [],
+        outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'mint',
         inputs: [
             { name: 'to', type: ABIDataTypes.ADDRESS },

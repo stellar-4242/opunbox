@@ -10,6 +10,7 @@ const WASM_PATH = path.resolve(__dirname, '../build/CaseEngine.wasm').replace(/\
 class CaseEngineContract extends ContractRuntime {
     public readonly openCaseSelector: number;
     public readonly getPoolInfoSelector: number;
+    public readonly initializeSelector: number;
 
     constructor(details: {
         deployer: Address;
@@ -23,10 +24,39 @@ class CaseEngineContract extends ContractRuntime {
         this.getPoolInfoSelector = Number(
             `0x${this.abiCoder.encodeSelector('getPoolInfo()')}`,
         );
+        this.initializeSelector = Number(
+            `0x${this.abiCoder.encodeSelector('initialize()')}`,
+        );
     }
 
     protected override defineRequiredBytecodes(): void {
         BytecodeManager.loadBytecode(WASM_PATH, this.address);
+    }
+
+    async callInitialize(
+        sender: Address,
+        motoAddr: Address,
+        casaAddr: Address,
+        lpPoolAddr: Address,
+        stakingAddr: Address,
+        pointsAddr: Address,
+        treasuryAddr: Address,
+    ): Promise<boolean> {
+        const writer = new BinaryWriter();
+        writer.writeSelector(this.initializeSelector);
+        writer.writeAddress(motoAddr);
+        writer.writeAddress(casaAddr);
+        writer.writeAddress(lpPoolAddr);
+        writer.writeAddress(stakingAddr);
+        writer.writeAddress(pointsAddr);
+        writer.writeAddress(treasuryAddr);
+        const result = await this.executeThrowOnError({
+            calldata: writer.getBuffer(),
+            sender,
+            txOrigin: sender,
+        });
+        const reader = new BinaryReader(result.response!);
+        return reader.readBoolean();
     }
 
     async openCase(
@@ -59,24 +89,6 @@ class CaseEngineContract extends ContractRuntime {
     }
 }
 
-function buildDeployCalldata(
-    motoAddr: Address,
-    casaAddr: Address,
-    lpPoolAddr: Address,
-    stakingAddr: Address,
-    pointsAddr: Address,
-    treasuryAddr: Address,
-): Buffer {
-    const writer = new BinaryWriter();
-    writer.writeAddress(motoAddr);
-    writer.writeAddress(casaAddr);
-    writer.writeAddress(lpPoolAddr);
-    writer.writeAddress(stakingAddr);
-    writer.writeAddress(pointsAddr);
-    writer.writeAddress(treasuryAddr);
-    return writer.getBuffer() as Buffer;
-}
-
 describe('CaseEngine', () => {
     let deployer: Address;
     let motoToken: Address;
@@ -107,23 +119,64 @@ describe('CaseEngine', () => {
         engine = new CaseEngineContract({
             deployer,
             address: engineAddress,
-            deploymentCalldata: buildDeployCalldata(
-                motoToken,
-                casaToken,
-                lpPool,
-                stakingContract,
-                pointsContract,
-                treasury,
-            ),
         });
 
         Blockchain.register(engine);
         await engine.init();
         await engine.deployContract();
+
+        // Call initialize() to configure peer addresses
+        Blockchain.msgSender = deployer;
+        Blockchain.txOrigin = deployer;
+        await engine.callInitialize(
+            deployer,
+            motoToken,
+            casaToken,
+            lpPool,
+            stakingContract,
+            pointsContract,
+            treasury,
+        );
     });
 
     afterEach(() => {
         engine.dispose();
+    });
+
+    describe('initialize', () => {
+        it('should revert on second call to initialize', async () => {
+            await expect(
+                engine.callInitialize(
+                    deployer,
+                    motoToken,
+                    casaToken,
+                    lpPool,
+                    stakingContract,
+                    pointsContract,
+                    treasury,
+                ),
+            ).rejects.toThrow();
+        });
+
+        it('should revert when non-deployer calls initialize', async () => {
+            const freshAddress = Blockchain.generateRandomAddress();
+            const fresh = new CaseEngineContract({ deployer, address: freshAddress });
+            Blockchain.register(fresh);
+            await fresh.init();
+            await fresh.deployContract();
+            await expect(
+                fresh.callInitialize(
+                    player,
+                    motoToken,
+                    casaToken,
+                    lpPool,
+                    stakingContract,
+                    pointsContract,
+                    treasury,
+                ),
+            ).rejects.toThrow();
+            fresh.dispose();
+        });
     });
 
     describe('openCase', () => {

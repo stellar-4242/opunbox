@@ -1,6 +1,19 @@
 {
     "functions": [
         {
+            "name": "initialize",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
             "name": "stake",
             "type": "Function",
             "payable": false,
@@ -59,6 +72,19 @@
                 {
                     "name": "success",
                     "type": "BOOL"
+                }
+            ]
+        },
+        {
+            "name": "getTotalWeightedStake",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "total",
+                    "type": "UINT256"
                 }
             ]
         },

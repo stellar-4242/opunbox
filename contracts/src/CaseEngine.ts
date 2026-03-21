@@ -8,6 +8,7 @@ import {
     Revert,
     SafeMath,
     StoredAddress,
+    StoredBoolean,
     encodeSelector,
 } from '@btc-vision/btc-runtime/runtime';
 import { u256 } from '@btc-vision/as-bignum/assembly';
@@ -66,6 +67,7 @@ export class CaseEngine extends OP_NET {
 
     // AUDIT FIX: per-address nonce
     private readonly noncePtr: u16 = Blockchain.nextPointer;
+    private readonly initializedPtr: u16 = Blockchain.nextPointer;
 
     private readonly motoToken: StoredAddress = new StoredAddress(this.motoTokenPtr);
     private readonly casaToken: StoredAddress = new StoredAddress(this.casaTokenPtr);
@@ -76,18 +78,31 @@ export class CaseEngine extends OP_NET {
 
     // AUDIT FIX: per-address nonce map
     private readonly nonces: AddressMemoryMap = new AddressMemoryMap(this.noncePtr);
+    private readonly initialized: StoredBoolean = new StoredBoolean(this.initializedPtr, false);
 
     public constructor() {
         super();
     }
 
     public override onDeployment(_calldata: Calldata): void {
-        const motoAddr: Address = _calldata.readAddress();
-        const casaAddr: Address = _calldata.readAddress();
-        const lpPoolAddr: Address = _calldata.readAddress();
-        const stakingAddr: Address = _calldata.readAddress();
-        const pointsAddr: Address = _calldata.readAddress();
-        const treasuryAddr: Address = _calldata.readAddress();
+        // No calldata initialization — addresses set via initialize()
+    }
+
+    // initialize([address moto, address casa, address lpPool, address staking, address points, address treasury])
+    // One-time call by deployer to configure peer contract addresses.
+    @method()
+    @returns({ name: 'success', type: ABIDataTypes.BOOL })
+    public initialize(calldata: Calldata): BytesWriter {
+        this.onlyDeployer(Blockchain.tx.sender);
+        if (this.initialized.value) throw new Revert('CaseEngine: already initialized');
+        this.initialized.value = true;
+
+        const motoAddr: Address = calldata.readAddress();
+        const casaAddr: Address = calldata.readAddress();
+        const lpPoolAddr: Address = calldata.readAddress();
+        const stakingAddr: Address = calldata.readAddress();
+        const pointsAddr: Address = calldata.readAddress();
+        const treasuryAddr: Address = calldata.readAddress();
 
         if (!motoAddr.isZero()) this.motoToken.value = motoAddr;
         if (!casaAddr.isZero()) this.casaToken.value = casaAddr;
@@ -95,6 +110,10 @@ export class CaseEngine extends OP_NET {
         if (!stakingAddr.isZero()) this.casaStaking.value = stakingAddr;
         if (!pointsAddr.isZero()) this.pointsContract.value = pointsAddr;
         if (!treasuryAddr.isZero()) this.treasury.value = treasuryAddr;
+
+        const w = new BytesWriter(1);
+        w.writeBoolean(true);
+        return w;
     }
 
     // openCase(uint256,bytes32) — EOA only

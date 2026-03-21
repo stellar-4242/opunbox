@@ -11,6 +11,7 @@ class CASATokenContract extends OP20 {
     public readonly isMinterSelector: number;
     public readonly getEmissionRateSelector: number;
     public readonly computeEmissionWithBoostSelector: number;
+    public readonly initializeSelector: number;
 
     constructor(details: {
         file: string;
@@ -29,6 +30,25 @@ class CASATokenContract extends OP20 {
         this.computeEmissionWithBoostSelector = Number(
             `0x${this.abiCoder.encodeSelector('computeEmissionWithBoost()')}`,
         );
+        this.initializeSelector = Number(
+            `0x${this.abiCoder.encodeSelector('initialize()')}`,
+        );
+    }
+
+    async callInitialize(sender: Address, minterAddresses: Address[]): Promise<boolean> {
+        const writer = new BinaryWriter();
+        writer.writeSelector(this.initializeSelector);
+        writer.writeU8(minterAddresses.length);
+        for (const addr of minterAddresses) {
+            writer.writeAddress(addr);
+        }
+        const result = await this.executeThrowOnError({
+            calldata: writer.getBuffer(),
+            sender,
+            txOrigin: sender,
+        });
+        const reader = new BinaryReader(result.response!);
+        return reader.readBoolean();
     }
 
     async mintTokens(sender: Address, to: Address, amount: bigint): Promise<boolean> {
@@ -80,16 +100,7 @@ class CASATokenContract extends OP20 {
     }
 }
 
-function buildDeployCalldata(minterAddresses: Address[]): Buffer {
-    const writer = new BinaryWriter();
-    writer.writeU8(minterAddresses.length);
-    for (const addr of minterAddresses) {
-        writer.writeAddress(addr);
-    }
-    return writer.getBuffer() as Buffer;
-}
-
-async function deployToken(minterAddresses: Address[] = []): Promise<CASATokenContract> {
+async function deployToken(): Promise<{ token: CASATokenContract; deployer: Address }> {
     const deployer = Blockchain.generateRandomAddress();
     const tokenAddress = Blockchain.generateRandomAddress();
 
@@ -101,13 +112,12 @@ async function deployToken(minterAddresses: Address[] = []): Promise<CASATokenCo
         deployer,
         address: tokenAddress,
         decimals: 18,
-        deploymentCalldata: buildDeployCalldata(minterAddresses),
     });
 
     Blockchain.register(token);
     await token.init();
     await token.deployContract();
-    return token;
+    return { token, deployer };
 }
 
 describe('CASAToken', () => {
@@ -128,7 +138,12 @@ describe('CASAToken', () => {
         Blockchain.msgSender = deployer;
         Blockchain.txOrigin = deployer;
 
-        token = await deployToken([minter1]);
+        const result = await deployToken();
+        token = result.token;
+        deployer = result.deployer;
+
+        // Call initialize() to set minters
+        await token.callInitialize(deployer, [minter1]);
     });
 
     afterEach(() => {
@@ -145,6 +160,19 @@ describe('CASAToken', () => {
         it('should have zero initial supply', async () => {
             const supply = await token.totalSupply();
             expect(supply).toBe(0n);
+        });
+    });
+
+    describe('initialize', () => {
+        it('should revert on second call to initialize', async () => {
+            const other = Blockchain.generateRandomAddress();
+            await expect(token.callInitialize(deployer, [other])).rejects.toThrow();
+        });
+
+        it('should revert when non-deployer calls initialize', async () => {
+            const { token: freshToken } = await deployToken();
+            await expect(freshToken.callInitialize(user, [minter1])).rejects.toThrow();
+            freshToken.dispose();
         });
     });
 

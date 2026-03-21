@@ -9,6 +9,7 @@ import {
     Revert,
     SafeMath,
     StoredAddress,
+    StoredBoolean,
     StoredU256,
     encodeSelector,
 } from '@btc-vision/btc-runtime/runtime';
@@ -44,6 +45,7 @@ export class CASAStaking extends OP_NET {
     private readonly caseEnginePtr: u16 = Blockchain.nextPointer;
     private readonly totalWeightedStakePtr: u16 = Blockchain.nextPointer;
     private readonly revenuePerWeightedStakePtr: u16 = Blockchain.nextPointer;
+    private readonly initializedPtr: u16 = Blockchain.nextPointer;
 
     private readonly stakeAmountPtr: u16 = Blockchain.nextPointer;
     private readonly stakeBlockPtr: u16 = Blockchain.nextPointer;
@@ -56,6 +58,7 @@ export class CASAStaking extends OP_NET {
     private readonly totalWeightedStake: StoredU256 = new StoredU256(this.totalWeightedStakePtr, EMPTY_POINTER);
     // revenuePerWeightedStake * 10^18 for precision
     private readonly revenuePerWeightedStake: StoredU256 = new StoredU256(this.revenuePerWeightedStakePtr, EMPTY_POINTER);
+    private readonly initialized: StoredBoolean = new StoredBoolean(this.initializedPtr, false);
 
     private readonly stakeAmount: AddressMemoryMap = new AddressMemoryMap(this.stakeAmountPtr);
     private readonly stakeBlock: AddressMemoryMap = new AddressMemoryMap(this.stakeBlockPtr);
@@ -69,13 +72,29 @@ export class CASAStaking extends OP_NET {
     }
 
     public override onDeployment(_calldata: Calldata): void {
-        const casaAddr: Address = _calldata.readAddress();
-        const motoAddr: Address = _calldata.readAddress();
-        const caseEngineAddr: Address = _calldata.readAddress();
+        // No calldata initialization — addresses set via initialize()
+    }
+
+    // initialize([address casa, address moto, address caseEngine])
+    // One-time call by deployer to configure peer contract addresses.
+    @method()
+    @returns({ name: 'success', type: ABIDataTypes.BOOL })
+    public initialize(calldata: Calldata): BytesWriter {
+        this.onlyDeployer(Blockchain.tx.sender);
+        if (this.initialized.value) throw new Revert('CASAStaking: already initialized');
+        this.initialized.value = true;
+
+        const casaAddr: Address = calldata.readAddress();
+        const motoAddr: Address = calldata.readAddress();
+        const caseEngineAddr: Address = calldata.readAddress();
 
         if (!casaAddr.isZero()) this.casaToken.value = casaAddr;
         if (!motoAddr.isZero()) this.motoToken.value = motoAddr;
         if (!caseEngineAddr.isZero()) this.caseEngine.value = caseEngineAddr;
+
+        const w = new BytesWriter(1);
+        w.writeBoolean(true);
+        return w;
     }
 
     // stake(uint256) — EOA only

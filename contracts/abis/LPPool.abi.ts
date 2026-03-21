@@ -4,6 +4,12 @@ export const LPPoolEvents = [];
 
 export const LPPoolAbi = [
     {
+        name: 'initialize',
+        inputs: [],
+        outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'deposit',
         inputs: [
             { name: 'amount', type: ABIDataTypes.UINT256 },
@@ -24,6 +30,12 @@ export const LPPoolAbi = [
             { name: 'recipient', type: ABIDataTypes.ADDRESS },
             { name: 'amount', type: ABIDataTypes.UINT256 },
         ],
+        outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
+        name: 'addPrincipal',
+        inputs: [{ name: 'amount', type: ABIDataTypes.UINT256 }],
         outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
         type: BitcoinAbiTypes.Function,
     },

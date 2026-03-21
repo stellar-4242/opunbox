@@ -4,6 +4,12 @@ export const CASAStakingEvents = [];
 
 export const CASAStakingAbi = [
     {
+        name: 'initialize',
+        inputs: [],
+        outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'stake',
         inputs: [{ name: 'amount', type: ABIDataTypes.UINT256 }],
         outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
@@ -25,6 +31,12 @@ export const CASAStakingAbi = [
         name: 'addRevenueShare',
         inputs: [{ name: 'amount', type: ABIDataTypes.UINT256 }],
         outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
+        name: 'getTotalWeightedStake',
+        inputs: [],
+        outputs: [{ name: 'total', type: ABIDataTypes.UINT256 }],
         type: BitcoinAbiTypes.Function,
     },
     {

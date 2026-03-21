@@ -15,6 +15,7 @@ class PointsContract extends ContractRuntime {
     public readonly triggerAirdropSelector: number;
     public readonly totalPointsSelector: number;
     public readonly isAuthorizedSelector: number;
+    public readonly initializeSelector: number;
 
     constructor(details: {
         deployer: Address;
@@ -43,10 +44,34 @@ class PointsContract extends ContractRuntime {
         this.isAuthorizedSelector = Number(
             `0x${this.abiCoder.encodeSelector('isAuthorized(address)')}`,
         );
+        this.initializeSelector = Number(
+            `0x${this.abiCoder.encodeSelector('initialize()')}`,
+        );
     }
 
     protected override defineRequiredBytecodes(): void {
         BytecodeManager.loadBytecode(WASM_PATH, this.address);
+    }
+
+    async callInitialize(
+        sender: Address,
+        authorizedAddresses: Address[],
+        casaAddr: Address,
+    ): Promise<boolean> {
+        const writer = new BinaryWriter();
+        writer.writeSelector(this.initializeSelector);
+        writer.writeU8(authorizedAddresses.length);
+        for (const addr of authorizedAddresses) {
+            writer.writeAddress(addr);
+        }
+        writer.writeAddress(casaAddr);
+        const result = await this.executeThrowOnError({
+            calldata: writer.getBuffer(),
+            sender,
+            txOrigin: sender,
+        });
+        const reader = new BinaryReader(result.response!);
+        return reader.readBoolean();
     }
 
     async addPoints(sender: Address, recipient: Address, amount: bigint): Promise<boolean> {
@@ -124,16 +149,6 @@ class PointsContract extends ContractRuntime {
     }
 }
 
-function buildDeployCalldata(authorizedAddresses: Address[], casaAddr: Address): Buffer {
-    const writer = new BinaryWriter();
-    writer.writeU8(authorizedAddresses.length);
-    for (const addr of authorizedAddresses) {
-        writer.writeAddress(addr);
-    }
-    writer.writeAddress(casaAddr);
-    return writer.getBuffer() as Buffer;
-}
-
 describe('Points', () => {
     let deployer: Address;
     let authorizedContract: Address;
@@ -158,16 +173,41 @@ describe('Points', () => {
         points = new PointsContract({
             deployer,
             address: pointsAddress,
-            deploymentCalldata: buildDeployCalldata([authorizedContract], casaToken),
         });
 
         Blockchain.register(points);
         await points.init();
         await points.deployContract();
+
+        // Call initialize() to set authorized contracts and CASA token
+        Blockchain.msgSender = deployer;
+        Blockchain.txOrigin = deployer;
+        await points.callInitialize(deployer, [authorizedContract], casaToken);
     });
 
     afterEach(() => {
         points.dispose();
+    });
+
+    describe('initialize', () => {
+        it('should revert on second call to initialize', async () => {
+            const other = Blockchain.generateRandomAddress();
+            await expect(
+                points.callInitialize(deployer, [other], casaToken),
+            ).rejects.toThrow();
+        });
+
+        it('should revert when non-deployer calls initialize', async () => {
+            const freshAddress = Blockchain.generateRandomAddress();
+            const fresh = new PointsContract({ deployer, address: freshAddress });
+            Blockchain.register(fresh);
+            await fresh.init();
+            await fresh.deployContract();
+            await expect(
+                fresh.callInitialize(user1, [authorizedContract], casaToken),
+            ).rejects.toThrow();
+            fresh.dispose();
+        });
     });
 
     describe('addPoints', () => {

@@ -9,6 +9,7 @@ import {
     Revert,
     SafeMath,
     StoredAddress,
+    StoredBoolean,
     StoredU256,
     encodeSelector,
 } from '@btc-vision/btc-runtime/runtime';
@@ -45,6 +46,7 @@ export class LPPool extends OP_NET {
     private readonly casaTokenPtr: u16 = Blockchain.nextPointer;
     private readonly pointsContractPtr: u16 = Blockchain.nextPointer;
     private readonly caseEnginePtr: u16 = Blockchain.nextPointer;
+    private readonly initializedPtr: u16 = Blockchain.nextPointer;
 
     // Pool state
     private readonly totalDepositedPtr: u16 = Blockchain.nextPointer;
@@ -62,6 +64,7 @@ export class LPPool extends OP_NET {
     private readonly casaToken: StoredAddress = new StoredAddress(this.casaTokenPtr);
     private readonly pointsContract: StoredAddress = new StoredAddress(this.pointsContractPtr);
     private readonly caseEngine: StoredAddress = new StoredAddress(this.caseEnginePtr);
+    private readonly initialized: StoredBoolean = new StoredBoolean(this.initializedPtr, false);
 
     private readonly totalDeposited: StoredU256 = new StoredU256(this.totalDepositedPtr, EMPTY_POINTER);
     private readonly totalWeightedShares: StoredU256 = new StoredU256(this.totalWeightedSharesPtr, EMPTY_POINTER);
@@ -79,15 +82,31 @@ export class LPPool extends OP_NET {
     }
 
     public override onDeployment(_calldata: Calldata): void {
-        const motoAddr: Address = _calldata.readAddress();
-        const casaAddr: Address = _calldata.readAddress();
-        const pointsAddr: Address = _calldata.readAddress();
-        const caseEngineAddr: Address = _calldata.readAddress();
+        // No calldata initialization — addresses set via initialize()
+    }
+
+    // initialize([address moto, address casa, address points, address caseEngine])
+    // One-time call by deployer to configure peer contract addresses.
+    @method()
+    @returns({ name: 'success', type: ABIDataTypes.BOOL })
+    public initialize(calldata: Calldata): BytesWriter {
+        this.onlyDeployer(Blockchain.tx.sender);
+        if (this.initialized.value) throw new Revert('LPPool: already initialized');
+        this.initialized.value = true;
+
+        const motoAddr: Address = calldata.readAddress();
+        const casaAddr: Address = calldata.readAddress();
+        const pointsAddr: Address = calldata.readAddress();
+        const caseEngineAddr: Address = calldata.readAddress();
 
         if (!motoAddr.isZero()) this.motoToken.value = motoAddr;
         if (!casaAddr.isZero()) this.casaToken.value = casaAddr;
         if (!pointsAddr.isZero()) this.pointsContract.value = pointsAddr;
         if (!caseEngineAddr.isZero()) this.caseEngine.value = caseEngineAddr;
+
+        const w = new BytesWriter(1);
+        w.writeBoolean(true);
+        return w;
     }
 
     // deposit(uint256,uint8) — EOA only

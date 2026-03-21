@@ -1,6 +1,19 @@
 {
     "functions": [
         {
+            "name": "initialize",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
             "name": "addPoints",
             "type": "Function",
             "payable": false,

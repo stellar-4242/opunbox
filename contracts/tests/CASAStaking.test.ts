@@ -14,6 +14,7 @@ class CASAStakingContract extends ContractRuntime {
     public readonly addRevenueShareSelector: number;
     public readonly getStakeInfoSelector: number;
     public readonly getPendingRewardsSelector: number;
+    public readonly initializeSelector: number;
 
     constructor(details: {
         deployer: Address;
@@ -35,10 +36,33 @@ class CASAStakingContract extends ContractRuntime {
         this.getPendingRewardsSelector = Number(
             `0x${this.abiCoder.encodeSelector('getPendingRewards(address)')}`,
         );
+        this.initializeSelector = Number(
+            `0x${this.abiCoder.encodeSelector('initialize()')}`,
+        );
     }
 
     protected override defineRequiredBytecodes(): void {
         BytecodeManager.loadBytecode(WASM_PATH, this.address);
+    }
+
+    async callInitialize(
+        sender: Address,
+        casaAddr: Address,
+        motoAddr: Address,
+        engineAddr: Address,
+    ): Promise<boolean> {
+        const writer = new BinaryWriter();
+        writer.writeSelector(this.initializeSelector);
+        writer.writeAddress(casaAddr);
+        writer.writeAddress(motoAddr);
+        writer.writeAddress(engineAddr);
+        const result = await this.executeThrowOnError({
+            calldata: writer.getBuffer(),
+            sender,
+            txOrigin: sender,
+        });
+        const reader = new BinaryReader(result.response!);
+        return reader.readBoolean();
     }
 
     async stake(sender: Address, amount: bigint): Promise<boolean> {
@@ -116,18 +140,6 @@ class CASAStakingContract extends ContractRuntime {
     }
 }
 
-function buildDeployCalldata(
-    casaAddr: Address,
-    motoAddr: Address,
-    engineAddr: Address,
-): Buffer {
-    const writer = new BinaryWriter();
-    writer.writeAddress(casaAddr);
-    writer.writeAddress(motoAddr);
-    writer.writeAddress(engineAddr);
-    return writer.getBuffer() as Buffer;
-}
-
 describe('CASAStaking', () => {
     let deployer: Address;
     let casaToken: Address;
@@ -152,16 +164,40 @@ describe('CASAStaking', () => {
         staking = new CASAStakingContract({
             deployer,
             address: stakingAddress,
-            deploymentCalldata: buildDeployCalldata(casaToken, motoToken, caseEngine),
         });
 
         Blockchain.register(staking);
         await staking.init();
         await staking.deployContract();
+
+        // Call initialize() to configure peer addresses
+        Blockchain.msgSender = deployer;
+        Blockchain.txOrigin = deployer;
+        await staking.callInitialize(deployer, casaToken, motoToken, caseEngine);
     });
 
     afterEach(() => {
         staking.dispose();
+    });
+
+    describe('initialize', () => {
+        it('should revert on second call to initialize', async () => {
+            await expect(
+                staking.callInitialize(deployer, casaToken, motoToken, caseEngine),
+            ).rejects.toThrow();
+        });
+
+        it('should revert when non-deployer calls initialize', async () => {
+            const freshAddress = Blockchain.generateRandomAddress();
+            const fresh = new CASAStakingContract({ deployer, address: freshAddress });
+            Blockchain.register(fresh);
+            await fresh.init();
+            await fresh.deployContract();
+            await expect(
+                fresh.callInitialize(staker1, casaToken, motoToken, caseEngine),
+            ).rejects.toThrow();
+            fresh.dispose();
+        });
     });
 
     describe('stake', () => {

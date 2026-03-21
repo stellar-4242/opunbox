@@ -4,12 +4,21 @@ export const CaseEngineEvents = [];
 
 export const CaseEngineAbi = [
     {
+        name: 'initialize',
+        inputs: [],
+        outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'openCase',
         inputs: [
             { name: 'amount', type: ABIDataTypes.UINT256 },
             { name: 'userSeed', type: ABIDataTypes.BYTES32 },
         ],
-        outputs: [{ name: 'won', type: ABIDataTypes.BOOL }],
+        outputs: [
+            { name: 'won', type: ABIDataTypes.BOOL },
+            { name: 'payout', type: ABIDataTypes.UINT256 },
+        ],
         type: BitcoinAbiTypes.Function,
     },
     {

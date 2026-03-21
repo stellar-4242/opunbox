@@ -10,6 +10,16 @@ import { CallResult, OPNetEvent, IOP_NETContract } from 'opnet';
 // ------------------------------------------------------------------
 
 /**
+ * @description Represents the result of the initialize function call.
+ */
+export type Initialize = CallResult<
+    {
+        success: boolean;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
  * @description Represents the result of the mint function call.
  */
 export type Mint = CallResult<
@@ -53,6 +63,7 @@ export type ComputeEmissionWithBoost = CallResult<
 // ICASAToken
 // ------------------------------------------------------------------
 export interface ICASAToken extends IOP_NETContract {
+    initialize(): Promise<Initialize>;
     mint(to: Address, amount: bigint): Promise<Mint>;
     getEmissionRate(): Promise<GetEmissionRate>;
     isMinter(addr: Address): Promise<IsMinter>;

@@ -10,6 +10,16 @@ import { CallResult, OPNetEvent, IOP_NETContract } from 'opnet';
 // ------------------------------------------------------------------
 
 /**
+ * @description Represents the result of the initialize function call.
+ */
+export type Initialize = CallResult<
+    {
+        success: boolean;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
  * @description Represents the result of the addPoints function call.
  */
 export type AddPoints = CallResult<
@@ -83,6 +93,7 @@ export type IsAuthorized = CallResult<
 // IPoints
 // ------------------------------------------------------------------
 export interface IPoints extends IOP_NETContract {
+    initialize(): Promise<Initialize>;
     addPoints(recipient: Address, amount: bigint): Promise<AddPoints>;
     getPoints(addr: Address): Promise<GetPoints>;
     setReferrer(referrer: Address): Promise<SetReferrer>;

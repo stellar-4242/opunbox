@@ -16,6 +16,7 @@ class LPPoolContract extends ContractRuntime {
     public readonly getAvailableBalanceSelector: number;
     public readonly getDepositInfoSelector: number;
     public readonly isAboveMinimumSelector: number;
+    public readonly initializeSelector: number;
 
     constructor(details: {
         deployer: Address;
@@ -45,10 +46,35 @@ class LPPoolContract extends ContractRuntime {
         this.isAboveMinimumSelector = Number(
             `0x${this.abiCoder.encodeSelector('isAboveMinimum()')}`,
         );
+        this.initializeSelector = Number(
+            `0x${this.abiCoder.encodeSelector('initialize()')}`,
+        );
     }
 
     protected override defineRequiredBytecodes(): void {
         BytecodeManager.loadBytecode(WASM_PATH, this.address);
+    }
+
+    async callInitialize(
+        sender: Address,
+        motoAddr: Address,
+        casaAddr: Address,
+        pointsAddr: Address,
+        engineAddr: Address,
+    ): Promise<boolean> {
+        const writer = new BinaryWriter();
+        writer.writeSelector(this.initializeSelector);
+        writer.writeAddress(motoAddr);
+        writer.writeAddress(casaAddr);
+        writer.writeAddress(pointsAddr);
+        writer.writeAddress(engineAddr);
+        const result = await this.executeThrowOnError({
+            calldata: writer.getBuffer(),
+            sender,
+            txOrigin: sender,
+        });
+        const reader = new BinaryReader(result.response!);
+        return reader.readBoolean();
     }
 
     async deposit(sender: Address, amount: bigint, tier: number): Promise<boolean> {
@@ -139,20 +165,6 @@ class LPPoolContract extends ContractRuntime {
     }
 }
 
-function buildDeployCalldata(
-    motoAddr: Address,
-    casaAddr: Address,
-    pointsAddr: Address,
-    engineAddr: Address,
-): Buffer {
-    const writer = new BinaryWriter();
-    writer.writeAddress(motoAddr);
-    writer.writeAddress(casaAddr);
-    writer.writeAddress(pointsAddr);
-    writer.writeAddress(engineAddr);
-    return writer.getBuffer() as Buffer;
-}
-
 describe('LPPool', () => {
     let deployer: Address;
     let motoToken: Address;
@@ -179,21 +191,40 @@ describe('LPPool', () => {
         pool = new LPPoolContract({
             deployer,
             address: poolAddress,
-            deploymentCalldata: buildDeployCalldata(
-                motoToken,
-                casaToken,
-                pointsContract,
-                caseEngine,
-            ),
         });
 
         Blockchain.register(pool);
         await pool.init();
         await pool.deployContract();
+
+        // Call initialize() to configure peer addresses
+        Blockchain.msgSender = deployer;
+        Blockchain.txOrigin = deployer;
+        await pool.callInitialize(deployer, motoToken, casaToken, pointsContract, caseEngine);
     });
 
     afterEach(() => {
         pool.dispose();
+    });
+
+    describe('initialize', () => {
+        it('should revert on second call to initialize', async () => {
+            await expect(
+                pool.callInitialize(deployer, motoToken, casaToken, pointsContract, caseEngine),
+            ).rejects.toThrow();
+        });
+
+        it('should revert when non-deployer calls initialize', async () => {
+            const freshAddress = Blockchain.generateRandomAddress();
+            const fresh = new LPPoolContract({ deployer, address: freshAddress });
+            Blockchain.register(fresh);
+            await fresh.init();
+            await fresh.deployContract();
+            await expect(
+                fresh.callInitialize(lp1, motoToken, casaToken, pointsContract, caseEngine),
+            ).rejects.toThrow();
+            fresh.dispose();
+        });
     });
 
     describe('deposit', () => {

@@ -1,6 +1,19 @@
 {
     "functions": [
         {
+            "name": "initialize",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
             "name": "deposit",
             "type": "Function",
             "payable": false,
@@ -45,6 +58,24 @@
                     "name": "recipient",
                     "type": "ADDRESS"
                 },
+                {
+                    "name": "amount",
+                    "type": "UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
+            "name": "addPrincipal",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
                 {
                     "name": "amount",
                     "type": "UINT256"

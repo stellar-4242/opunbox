@@ -10,6 +10,16 @@ import { CallResult, OPNetEvent, IOP_NETContract } from 'opnet';
 // ------------------------------------------------------------------
 
 /**
+ * @description Represents the result of the initialize function call.
+ */
+export type Initialize = CallResult<
+    {
+        success: boolean;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
  * @description Represents the result of the stake function call.
  */
 export type Stake = CallResult<
@@ -50,6 +60,16 @@ export type AddRevenueShare = CallResult<
 >;
 
 /**
+ * @description Represents the result of the getTotalWeightedStake function call.
+ */
+export type GetTotalWeightedStake = CallResult<
+    {
+        total: bigint;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
  * @description Represents the result of the getStakeInfo function call.
  */
 export type GetStakeInfo = CallResult<
@@ -73,10 +93,12 @@ export type GetPendingRewards = CallResult<
 // ICASAStaking
 // ------------------------------------------------------------------
 export interface ICASAStaking extends IOP_NETContract {
+    initialize(): Promise<Initialize>;
     stake(amount: bigint): Promise<Stake>;
     unstake(): Promise<Unstake>;
     claimRewards(): Promise<ClaimRewards>;
     addRevenueShare(amount: bigint): Promise<AddRevenueShare>;
+    getTotalWeightedStake(): Promise<GetTotalWeightedStake>;
     getStakeInfo(addr: Address): Promise<GetStakeInfo>;
     getPendingRewards(addr: Address): Promise<GetPendingRewards>;
 }

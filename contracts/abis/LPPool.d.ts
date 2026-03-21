@@ -10,6 +10,16 @@ import { CallResult, OPNetEvent, IOP_NETContract } from 'opnet';
 // ------------------------------------------------------------------
 
 /**
+ * @description Represents the result of the initialize function call.
+ */
+export type Initialize = CallResult<
+    {
+        success: boolean;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
  * @description Represents the result of the deposit function call.
  */
 export type Deposit = CallResult<
@@ -33,6 +43,16 @@ export type Withdraw = CallResult<
  * @description Represents the result of the pullPayout function call.
  */
 export type PullPayout = CallResult<
+    {
+        success: boolean;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
+ * @description Represents the result of the addPrincipal function call.
+ */
+export type AddPrincipal = CallResult<
     {
         success: boolean;
     },
@@ -93,9 +113,11 @@ export type IsAboveMinimum = CallResult<
 // ILPPool
 // ------------------------------------------------------------------
 export interface ILPPool extends IOP_NETContract {
+    initialize(): Promise<Initialize>;
     deposit(amount: bigint, lockTier: number): Promise<Deposit>;
     withdraw(): Promise<Withdraw>;
     pullPayout(recipient: Address, amount: bigint): Promise<PullPayout>;
+    addPrincipal(amount: bigint): Promise<AddPrincipal>;
     addRevenue(amount: bigint): Promise<AddRevenue>;
     getTotalDeposited(): Promise<GetTotalDeposited>;
     getAvailableBalance(): Promise<GetAvailableBalance>;

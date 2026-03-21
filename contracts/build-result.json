@@ -1,0 +1,50 @@
+{
+  "status": "success",
+  "contracts": {
+    "CaseEngine": {
+      "wasm": "build/CaseEngine.wasm",
+      "abi": "abis/CaseEngine.abi.json"
+    },
+    "LPPool": {
+      "wasm": "build/LPPool.wasm",
+      "abi": "abis/LPPool.abi.json"
+    },
+    "CASAToken": {
+      "wasm": "build/CASAToken.wasm",
+      "abi": "abis/CASAToken.abi.json"
+    },
+    "CASAStaking": {
+      "wasm": "build/CASAStaking.wasm",
+      "abi": "abis/CASAStaking.abi.json"
+    },
+    "Points": {
+      "wasm": "build/Points.wasm",
+      "abi": "abis/Points.abi.json"
+    }
+  },
+  "fixes": [
+    "CRITICAL: LPPool.addRevenue() — re-added totalDeposited += amount. Physical MOTO enters the pool on every call; the ledger must track it so _getAvailableBalance() and pullPayout() remain consistent over time. Also added zero-address guard (caseEngine.isZero() check) before the caller check.",
+    "HIGH: CaseEngine._distributeHouseEdge() — when no stakers exist (getTotalWeightedStake()==0), staking share is redirected to the LP pool instead of being sent to CASAStaking where it would be permanently trapped. Added _stakingHasStakers() helper that calls getTotalWeightedStake() on CASAStaking.",
+    "HIGH: CaseEngine.openCase() — won is now defined as payout >= betAmount. Blue (0.25x) returns won=false (net loss for player). Purple (2x) and above return won=true. This lets the frontend correctly display outcomes.",
+    "HIGH: CASAStaking.addRevenueShare() — added zero-address guard: if caseEngine is zero address, revert 'not configured' before the caller equality check, preventing address(0) spoofing.",
+    "HIGH: CASAStaking — added getTotalWeightedStake() public view method so CaseEngine can query whether any stakers exist before distributing the staking share.",
+    "MEDIUM: CaseEngine.openCase() — moved availBal/_getAvailablePoolBalance() and maxPayout computation to AFTER _distributeHouseEdge() and the net bet transfer. Pool balance now reflects all inflows before the cap is checked, avoiding false reverts on large winning bets.",
+    "FIX1-LPPool: _mintCASAForLP now calls CASAToken.computeEmissionWithBoost() for boost-aware rate; emission = amount * rate / 1_000_000. Handles halving and 3x early LP boost correctly.",
+    "FIX1-CaseEngine: _mintCASAForPlayer now calls CASAToken.getEmissionRate() for halving-aware rate; emission = betAmount * rate / 1_000_000. Players get no 3x boost (LP-only incentive).",
+    "FIX2-CASAStaking: _getCurrentMultiplier returns 0 during 7-day warmup (elapsed < BLOCKS_7D=1008). Stakers earn nothing for first 7 days; 1.0x kicks in after. Added BLOCKS_7D constant.",
+    "FIX3-CaseEngine: RTP comment corrected from 0.950 to 0.9494 ≈ 95% RTP (house edge ~5.06%).",
+    "FIX4-backend/store.ts: leaderboard sort uses bigint comparison (bVal > aVal return 1) instead of Number(BigInt - BigInt) to avoid precision loss on large u256 values.",
+    "FIX5-CASAStaking._checkpointWeightedStake: Reset stakeRevenueSnapshot when oldWeighted==0 && newWeighted>0 (warmup exit transition), preventing stakers from claiming rewards accumulated during their 7-day warmup window when effective weight was zero.",
+    "FIX6-CaseEngine.openCase: Added MIN_BET constant (1 MOTO = 10^18) and guard 'if (u256.lt(betAmount, MIN_BET)) throw new Revert(...)' after the zero-amount check, preventing tiny bets where integer division betAmount*25/100 yields 0 causing pullPayout(0) to revert.",
+    "LOOP-FIX1: CASAStaking.ts stake() — pays out pending MOTO rewards before resetting revenueSnapshot on additive stake, preventing forfeiture of accumulated rewards",
+    "LOOP-FIX2: Points.ts setReferrer() — rejects circular referrals (A->B when B already has A as referrer) to prevent double 10% inflation of airdrop shares",
+    "LOOP-FIX3: LPPool.ts pullPayout() — replaced floor-to-zero with strict SafeMath.sub to surface underflow accounting bugs",
+    "LOOP-FIX3: LPPool.ts withdraw() — replaced floor-to-zero with strict SafeMath.sub",
+    "LOOP-FIX3: CASAStaking.ts unstake() — replaced floor-to-zero with strict SafeMath.sub for totalWeightedStake"
+  ],
+  "pipeline": {
+    "lint": "PASS",
+    "build": "PASS",
+    "test": "PASS (49/49)"
+  }
+}

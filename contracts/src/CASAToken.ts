@@ -14,6 +14,7 @@ import {
 } from '@btc-vision/btc-runtime/runtime';
 import { u256 } from '@btc-vision/as-bignum/assembly';
 
+
 // $CASA Token — OPNet OP-20
 // Max supply: 1,000,000,000 CASA (18 decimals)
 // Mint only by authorized minters
@@ -32,6 +33,7 @@ export class CASAToken extends OP20 {
     private readonly initialEmissionRatePtr: u16 = Blockchain.nextPointer;
     private readonly minterAuthPtr: u16 = Blockchain.nextPointer;
     private readonly mintClosedPtr: u16 = Blockchain.nextPointer;
+    private readonly initializedPtr: u16 = Blockchain.nextPointer;
 
     private readonly deploymentBlock: StoredU256 = new StoredU256(
         this.deploymentBlockPtr,
@@ -42,6 +44,7 @@ export class CASAToken extends OP20 {
         EMPTY_POINTER,
     );
     private readonly mintClosed: StoredBoolean = new StoredBoolean(this.mintClosedPtr, false);
+    private readonly initialized: StoredBoolean = new StoredBoolean(this.initializedPtr, false);
 
     // address => 1/0 authorization flag
     private readonly minters: AddressMemoryMap = new AddressMemoryMap(this.minterAuthPtr);
@@ -52,18 +55,30 @@ export class CASAToken extends OP20 {
 
     public override onDeployment(_calldata: Calldata): void {
         this.instantiate(new OP20InitParameters(MAX_SUPPLY, 18, 'CASA Token', 'CASA'));
-
         this.deploymentBlock.value = u256.fromU64(Blockchain.block.number);
         this.initialEmissionRate.value = u256.fromU64(1000);
+    }
 
-        // Parse minter addresses: [uint8 count, address, ...]
-        const count: u8 = _calldata.readU8();
+    // initialize([uint8 count, address minter1, ..., address minterN])
+    // One-time call by deployer to set authorized minters.
+    @method()
+    @returns({ name: 'success', type: ABIDataTypes.BOOL })
+    public initialize(calldata: Calldata): BytesWriter {
+        this.onlyDeployer(Blockchain.tx.sender);
+        if (this.initialized.value) throw new Revert('CASAToken: already initialized');
+        this.initialized.value = true;
+
+        const count: u8 = calldata.readU8();
         for (let i: u8 = 0; i < count; i++) {
-            const addr: Address = _calldata.readAddress();
+            const addr: Address = calldata.readAddress();
             if (!addr.isZero()) {
                 this.minters.set(addr, u256.One);
             }
         }
+
+        const w = new BytesWriter(1);
+        w.writeBoolean(true);
+        return w;
     }
 
     // mint(address,uint256) — authorized minters only
